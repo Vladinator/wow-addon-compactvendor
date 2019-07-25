@@ -1,0 +1,5 @@
+package-as: CompactVendor
+enable-nolib-creation: no
+tools-used:
+		- unfit
+		- libstub
