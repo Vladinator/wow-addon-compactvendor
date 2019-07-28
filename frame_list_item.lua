@@ -16,6 +16,7 @@ local VladsVendorListItemEvents = {
 
 VladsVendorListItemMixin.Background = {}
 VladsVendorListItemMixin.Color = {}
+VladsVendorListItemMixin.ItemHexColorToQualityIndex = {}
 do
 	-- additional colors
 	VladsVendorListItemMixin.Background.None   = { 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 }
@@ -44,14 +45,17 @@ do
 	VladsVendorListItemMixin.Background[7] = VladsVendorListItemMixin.Background.Heirloom
 
 	-- item qualities text
-	for i = 0, 7 do
+	for i = 0, 8 do
 		local r, g, b, hex = GetItemQualityColor(i)
+
 		VladsVendorListItemMixin.Color[i] = {
 			r = r,
 			g = g,
 			b = b,
 			hex = hex,
 		}
+
+		VladsVendorListItemMixin.ItemHexColorToQualityIndex[hex] = i
 	end
 
 	VladsVendorListItemMixin.Color.None = VladsVendorListItemMixin.Color[0]
@@ -230,7 +234,6 @@ function VladsVendorListItemMixin:OnClick(button)
 	end
 	if button == "LeftButton" then
 		if IsModifiedClick("DRESSUP") then
-			local item = self:GetItem()
 			if DressUpItemLink(item.link) then
 			elseif DressUpBattlePetLink(item.link) then
 			elseif DressUpMountLink(item.link) then
@@ -241,6 +244,17 @@ function VladsVendorListItemMixin:OnClick(button)
 	elseif button == "RightButton" then
 		self:Purchase()
 	end
+end
+
+function VladsVendorListItemMixin:GetQualityIndexFromLink(link)
+	if not link then
+		return
+	end
+	local hex = link:match("|c([%x]+)|")
+	if not hex then
+		return
+	end
+	return self.ItemHexColorToQualityIndex[hex]
 end
 
 function VladsVendorListItemMixin:HasItem()
@@ -269,7 +283,7 @@ function VladsVendorListItemMixin:SetItem(index)
 		item.link = GetMerchantItemLink(index)
 
 		if item.currencyID then
-			item.name, item.texture, item.numAvailable = CurrencyContainerUtil.GetCurrencyContainerInfo(item.currencyID, item.numAvailable, item.name, item.texture, nil)
+			item.name, item.texture, item.numAvailable, item.quality = CurrencyContainerUtil.GetCurrencyContainerInfo(item.currencyID, item.numAvailable, item.name, item.texture, nil)
 		end
 
 		if item.link then
@@ -281,7 +295,9 @@ function VladsVendorListItemMixin:SetItem(index)
 			item.classID,
 			item.subClassID = GetItemInfoInstant(item.link)
 
-			item.quality = select(3, GetItemInfo(item.link))
+			if not item.currencyID then
+				item.quality = select(3, GetItemInfo(item.link)) or self:GetQualityIndexFromLink(item.link) or 1
+			end
 
 			item.qualityColorR,
 			item.qualityColorG,
@@ -415,7 +431,7 @@ function VladsVendorListItemMixin:Purchase(quantity, fromStackPopup)
 			end
 		end
 	else
-		-- TODO: can buy in bulk? Internal Bag Error could fix by sending the command in a for loop instead
+		-- TODO: can buy in bulk? Internal Bag Error could fix by sending the command in a for loop instead -- if quantity ~= item.stackCount then end
 		BuyMerchantItem(item.index, quantity)
 	end
 end

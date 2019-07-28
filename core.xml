@@ -10,7 +10,7 @@
 		<Size x="172" y="96"/>
 		<Layers>
 			<Layer level="BACKGROUND">
-				<Texture parentKey="SingleItemSplitBackground" file="Interface\MoneyFrame\UI-MoneyFrame" >
+				<Texture parentKey="SingleItemSplitBackground" file="Interface\MoneyFrame\UI-MoneyFrame">
 					<Size x="256" y="32"/>
 					<TexCoords left="0" right="0.671875" top="0" bottom="0.75"/>
 				</Texture>

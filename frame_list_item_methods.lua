@@ -56,6 +56,10 @@ function VladsVendorListItemMethodsMixin:CanAfford()
 	return afford ~= false
 end
 
+function VladsVendorListItemMethodsMixin:IsCurrency()
+	return item.currencyID
+end
+
 function VladsVendorListItemMethodsMixin:IsRecipe()
 	return self.classID == LE_ITEM_CLASS_RECIPE
 end
@@ -73,7 +77,7 @@ function VladsVendorListItemMethodsMixin:IsBattlePet()
 end
 
 function VladsVendorListItemMethodsMixin:IsHeirloom()
-	return C_Heirloom.IsItemHeirloom(self.id) or C_Heirloom.PlayerHasHeirloom(self.id)
+	return self.id and (C_Heirloom.IsItemHeirloom(self.id) or C_Heirloom.PlayerHasHeirloom(self.id))
 end
 
 function VladsVendorListItemMethodsMixin:IsToy()

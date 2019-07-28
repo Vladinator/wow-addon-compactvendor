@@ -70,7 +70,7 @@ local TooltipPool do
 	local function OnTooltipCreate(pool)
 		local tip = CreateFrame("GameTooltip", nil, WorldFrame)
 		tip.textLeft, tip.textRight = {}, {}
-		for i = 1, 30 do
+		for i = 1, 64 do
 			tip.textLeft[i], tip.textRight[i] = tip:CreateFontString(nil, nil, "GameFontNormal"), tip:CreateFontString(nil, nil, "GameFontNormal")
 			tip:AddFontStrings(tip.textLeft[i], tip.textRight[i])
 		end
@@ -265,7 +265,7 @@ function VladsVendorListTooltipMixin:TooltipScanInstant(itemButton, link)
 	-- set the tip hyperlink
 	InstantTip:SetHyperlink(link)
 	-- instantly respond
-	itemButton:TooltipCallbackInstant(InstantTip)
+	return itemButton:TooltipCallbackInstant(InstantTip)
 end
 
 --[[ generic useful methods
