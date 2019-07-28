@@ -81,7 +81,7 @@ function VladsVendorListItemMethodsMixin:IsHeirloom()
 end
 
 function VladsVendorListItemMethodsMixin:IsToy()
-	return self:IsMisc() and select(2, C_ToyBox.GetToyInfo(self.id))
+	return self.id and C_ToyBox.GetToyInfo(self.id)
 end
 
 function VladsVendorListItemMethodsMixin:CanLearn()
