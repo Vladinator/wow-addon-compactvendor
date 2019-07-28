@@ -181,6 +181,7 @@ VladsVendorListTooltipMixin.UseExperimentalScanning = true
 local InstantTip do
 	InstantTip = TooltipPool:Acquire()
 	InstantTip:SetScript("OnTooltipSetItem", nil)
+	InstantTip:SetScript("OnTooltipSetSpell", nil)
 
 	local TextLeft = InstantTip.textLeft
 	local TextRight = InstantTip.textRight
@@ -267,15 +268,3 @@ function VladsVendorListTooltipMixin:TooltipScanInstant(itemButton, link)
 	-- instantly respond
 	return itemButton:TooltipCallbackInstant(InstantTip)
 end
-
---[[ generic useful methods
-function VladsVendorListTooltipMixin:IsKnown(link)
-	InstantTip:SetHyperlink(link)
-	for i = 2, InstantTip:NumLines(), 1 do
-		if InstantTip.L[i] == _G.ITEM_SPELL_KNOWN then
-			return true
-		end
-	end
-	return false
-end
---]]
