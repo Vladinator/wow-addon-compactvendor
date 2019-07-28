@@ -242,7 +242,11 @@ function VladsVendorListItemMixin:OnClick(button)
 			self:SelectQuantity()
 		end
 	elseif button == "RightButton" then
-		self:Purchase()
+		if IsModifiedClick("ALT") then
+			self:Purchase(item.maxStackCount)
+		else
+			self:Purchase()
+		end
 	end
 end
 
@@ -295,8 +299,11 @@ function VladsVendorListItemMixin:SetItem(index)
 			item.classID,
 			item.subClassID = GetItemInfoInstant(item.link)
 
+			local _, _, quality, _, _, _, _, maxStackCount = GetItemInfo(item.link)
+			item.maxStackCount = maxStackCount
+
 			if not item.currencyID then
-				item.quality = select(3, GetItemInfo(item.link)) or self:GetQualityIndexFromLink(item.link) or 1
+				item.quality = quality or self:GetQualityIndexFromLink(item.link) or 1
 			end
 
 			item.qualityColorR,
