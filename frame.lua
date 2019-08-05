@@ -77,6 +77,10 @@ function VladsVendorFrameMixin:SetupElvUI()
 		return
 	end
 
+	if not E.Border then
+		return
+	end
+
 	if not self.List or not self.List.ListScrollFrame or not self.List.ListScrollFrame.ScrollBar then
 		return
 	end
