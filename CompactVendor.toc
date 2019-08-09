@@ -2,6 +2,7 @@
 ## Title: CompactVendor
 ## Notes: Compact Vendor converts your vendor frame into a compact scrollable list with a search box. Inspiration drawn from Tekkub's GnomishVendorShrinker.
 ## Author: Vladinator
-## Version: 8.2.0.190805
+## Version: 8.2.0.190809
+## SavedVariables: CompactVendorDB
 libs.xml
 core.xml

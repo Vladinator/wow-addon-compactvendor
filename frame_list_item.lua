@@ -61,13 +61,31 @@ do
 	VladsVendorListItemMixin.Color.None = VladsVendorListItemMixin.Color[0]
 end
 
+function VladsVendorListItemMixin:UpdateScale()
+	local frame = self:GetParent():GetParent()
+	local frameWidth = frame:GetWidth()
+
+	local width, height = self:GetSize()
+	local scale = CompactVendorDB.ListItemScale or 1
+
+	self:SetSize(frameWidth - 5, height * scale)
+
+	self.Icon:SetScale(scale)
+	self.CircleMask:SetScale(scale)
+	self.Name:SetScale(scale)
+
+	self.Quantity:SetScale(scale)
+	self.Cost:SetScale(scale)
+end
+
 function VladsVendorListItemMixin:OnLoad()
-	self:SetWidth(self:GetParent():GetParent():GetWidth() - 5) -- TODO: is this working in all situations?
 	self.item = CreateFromMixins(VladsVendorListItemMethodsMixin)
 
 	--[[ global into private callback ]] self.tooltipCallback = function(...)
 		self:TooltipCallback(...)
 	end
+
+	self:UpdateScale()
 end
 
 local band = bit.band
