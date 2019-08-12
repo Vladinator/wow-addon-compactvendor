@@ -301,7 +301,7 @@ function VladsVendorListItemMixin:SetItem(index)
 		item.extendedCost,
 		item.currencyID = GetMerchantItemInfo(index)
 
-		item.canRefund = C_MerchantFrame.IsMerchantItemRefundable(index)
+		item.canRefund = C_MerchantFrame.IsMerchantItemRefundable and C_MerchantFrame.IsMerchantItemRefundable(index)
 		item.link = GetMerchantItemLink(index)
 
 		if item.currencyID then
@@ -320,8 +320,8 @@ function VladsVendorListItemMixin:SetItem(index)
 			local _, _, quality, _, _, _, _, maxStackCount = GetItemInfo(item.link)
 			item.maxStackCount = maxStackCount
 
-			if not item.currencyID then
-				item.quality = quality or self:GetQualityIndexFromLink(item.link) or 1
+			if not item.currencyID or not item.quality then
+				item.quality = quality or self:GetQualityIndexFromLink(item.link) or item.quality or 1
 			end
 
 			item.qualityColorR,
@@ -419,6 +419,10 @@ function VladsVendorListItemMixin:SelectQuantity()
 end
 
 function VladsVendorListItemMixin:RequiresConfirmation()
+	-- classic doesn't support the confirmation extended item cost functionality of the merchant frame
+	if WOW_PROJECT_ID == WOW_PROJECT_CLASSIC then
+		return false
+	end
 	-- if the npc is marked as a special requirement, either confirm all purchases, or skip all confirmations
 	local id, npcType, guid = self:GetList():GetNPC()
 	if id and (npcType == "Creature" or npcType == "Vehicle") then

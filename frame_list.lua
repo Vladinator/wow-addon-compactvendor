@@ -35,8 +35,10 @@ function VladsVendorListMixin:OnLoad()
 	self.ListScrollFrame.ScrollBar.doNotHide = true
 	self.ListScrollFrame.ScrollBar:SetValue(0)
 
-	hooksecurefunc("SetMerchantFilter", OnFilter)
-	hooksecurefunc("ResetSetMerchantFilter", OnFilter)
+	if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+		hooksecurefunc("SetMerchantFilter", OnFilter)
+		hooksecurefunc("ResetSetMerchantFilter", OnFilter)
+	end
 
 	--[[ global into private callback ]] self.searchCallback = function(_, text)
 		self:SearchCallback(text)

@@ -77,11 +77,11 @@ function VladsVendorListItemMethodsMixin:IsBattlePet()
 end
 
 function VladsVendorListItemMethodsMixin:IsHeirloom()
-	return self.id and (C_Heirloom.IsItemHeirloom(self.id) or C_Heirloom.PlayerHasHeirloom(self.id))
+	return self.id and C_Heirloom and (C_Heirloom.IsItemHeirloom(self.id) or C_Heirloom.PlayerHasHeirloom(self.id))
 end
 
 function VladsVendorListItemMethodsMixin:IsToy()
-	return self.id and C_ToyBox.GetToyInfo(self.id)
+	return self.id and C_ToyBox and C_ToyBox.GetToyInfo(self.id)
 end
 
 function VladsVendorListItemMethodsMixin:CanLearn()
