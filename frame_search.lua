@@ -2,7 +2,12 @@ VladsVendorFrameSearchMixin = {}
 
 function VladsVendorFrameSearchMixin:OnLoad()
 	SearchBoxTemplate_OnLoad(self)
-	self:SetPoint("RIGHT", MerchantFrameLootFilter, "LEFT", 14, 3)
+	if MerchantFrameLootFilter then
+		self:SetPoint("RIGHT", MerchantFrameLootFilter, "LEFT", 14, 3)
+	else
+		self:SetPoint("LEFT", MerchantFramePortrait, "RIGHT", 12, -19)
+		self:SetPoint("RIGHT", MerchantFrame, "RIGHT", -12, 0)
+	end
 end
 
 function VladsVendorFrameSearchMixin:OnHide()
