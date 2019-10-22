@@ -79,7 +79,7 @@ function VladsVendorListItemMixin:UpdateScale()
 end
 
 function VladsVendorListItemMixin:OnLoad()
-	self.item = CreateFromMixins(VladsVendorListItemMethodsMixin)
+	self.item = CreateFromMixins(VladsVendorListItemMethodsMixin) ---@type VladsVendorListItemMethodsMixin
 
 	--[[ global into private callback ]] self.tooltipCallback = function(...)
 		self:TooltipCallback(...)
@@ -139,11 +139,11 @@ end
 		local line = lines[i]
 		local textLeft, textRight, colorLeft, colorRight = line[1], line[2], line[3], line[4]
 		local lineType, canUse = VladsVendorListTooltipMixin:TooltipTextParse(textLeft, colorLeft)
-		if lineType == 1 and not canUse then mask = bor(mask, RecipeMask.Reputation) end
-		if lineType == 2 and not canUse then mask = bor(mask, RecipeMask.Profession) end
-		if lineType == 3 and not canUse then mask = bor(mask, RecipeMask.ProfessionRank) end
-		if lineType == 4 and not canUse then mask = bor(mask, RecipeMask.AlreadyKnown) end
-		if lineType == 5 and not canUse then mask = bor(mask, RecipeMask.BattlePetCollected) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.Reputation and not canUse then mask = bor(mask, RecipeMask.Reputation) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.Profession and not canUse then mask = bor(mask, RecipeMask.Profession) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.ProfessionRank and not canUse then mask = bor(mask, RecipeMask.ProfessionRank) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.AlreadyKnown and not canUse then mask = bor(mask, RecipeMask.AlreadyKnown) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.BattlePetCollected and not canUse then mask = bor(mask, RecipeMask.BattlePetCollected) end
 	end
 	-- set button colors
 	self:TooltipCallbackSetColors(mask)
@@ -166,11 +166,11 @@ function VladsVendorListItemMixin:TooltipCallbackInstant(tip)
 		local textLeft = tip.L[i]
 		local colorLeft = tip.LC[i]
 		local lineType, canUse = VladsVendorListTooltipMixin:TooltipTextParse(textLeft, colorLeft)
-		if lineType == 1 and not canUse then mask = bor(mask, RecipeMask.Reputation) end
-		if lineType == 2 and not canUse then mask = bor(mask, RecipeMask.Profession) end
-		if lineType == 3 and not canUse then mask = bor(mask, RecipeMask.ProfessionRank) end
-		if lineType == 4 and not canUse then mask = bor(mask, RecipeMask.AlreadyKnown) end
-		if lineType == 5 and not canUse then mask = bor(mask, RecipeMask.BattlePetCollected) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.Reputation and not canUse then mask = bor(mask, RecipeMask.Reputation) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.Profession and not canUse then mask = bor(mask, RecipeMask.Profession) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.ProfessionRank and not canUse then mask = bor(mask, RecipeMask.ProfessionRank) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.AlreadyKnown and not canUse then mask = bor(mask, RecipeMask.AlreadyKnown) end
+		if lineType == VladsVendorListTooltipMixin.TooltipTextType.BattlePetCollected and not canUse then mask = bor(mask, RecipeMask.BattlePetCollected) end
 	end
 	-- set button colors
 	self:TooltipCallbackSetColors(mask)
