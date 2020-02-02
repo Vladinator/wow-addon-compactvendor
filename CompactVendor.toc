@@ -1,8 +1,8 @@
-## Interface: 80205
+## Interface: 80300
 ## Title: CompactVendor
 ## Notes: Compact Vendor converts your vendor frame into a compact scrollable list with a search box. Inspiration drawn from Tekkub's GnomishVendorShrinker.
 ## Author: Vladinator
-## Version: 8.2.0.190812
+## Version: 8.3.0.200202
 ## SavedVariables: CompactVendorDB
 ## X-Curse-Project-ID: 332178
 ## X-WoWI-ID: 25073
