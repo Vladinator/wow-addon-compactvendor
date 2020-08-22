@@ -1,4 +1,4 @@
-VladsVendorListMixin = CreateFromMixins(CallbackRegistryBaseMixin)
+VladsVendorListMixin = CreateFromMixins(CallbackRegistryMixin or CallbackRegistryBaseMixin)
 
 local LibItemSearch = LibStub("LibItemSearch-1.2")
 
@@ -15,7 +15,7 @@ VladsVendorListMixin:GenerateCallbackEvents({
 })
 
 function VladsVendorListMixin:OnLoad()
-	CallbackRegistryBaseMixin.OnLoad(self)
+	(CallbackRegistryMixin or CallbackRegistryBaseMixin).OnLoad(self)
 
 	local function OnScroll()
 		self.isScrollUpdate = true -- avoid recursion
@@ -47,7 +47,7 @@ end
 
 function VladsVendorListMixin:OnShow()
 	FrameUtil.RegisterFrameForEvents(self, VladsVendorListEvents)
-	self:RegisterCallback(VladsVendorListMixin.Event.Search, self.searchCallback)
+	self:RegisterCallback(VladsVendorListMixin.Event.Search, self.searchCallback, self.searchCallback)
 	self:Update()
 end
 

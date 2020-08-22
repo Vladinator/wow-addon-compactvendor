@@ -22,7 +22,7 @@ function VladsVendorListItemQuantityButtonMixin:OnLoad()
 end
 
 function VladsVendorListItemQuantityButtonMixin:OnShow()
-	self:GetList():RegisterCallback(VladsVendorListMixin.Event.Scroll, self.listScrollCallback)
+	self:GetList():RegisterCallback(VladsVendorListMixin.Event.Scroll, self.listScrollCallback, self.listScrollCallback)
 end
 
 function VladsVendorListItemQuantityButtonMixin:OnHide()

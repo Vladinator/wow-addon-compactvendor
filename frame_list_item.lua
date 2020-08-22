@@ -178,7 +178,7 @@ end
 
 function VladsVendorListItemMixin:OnShow()
 	FrameUtil.RegisterFrameForEvents(self, VladsVendorListItemEvents)
-	self:GetList():RegisterCallback(VladsVendorListMixin.Event.Tooltip, self.tooltipCallback)
+	self:GetList():RegisterCallback(VladsVendorListMixin.Event.Tooltip, self.tooltipCallback, self.tooltipCallback)
 	self:Update()
 end
 

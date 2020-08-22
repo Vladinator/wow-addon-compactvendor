@@ -38,7 +38,7 @@ function VladsVendorListItemMethodsMixin:HasRealExtendedCost()
 		-- if the item is a common barter item we don't care but if it's a rare one we ask to confirm
 		if link then
 			local _, _, quality = GetItemInfo(link)
-			if quality >= LE_ITEM_QUALITY_UNCOMMON then
+			if quality >= (LE_ITEM_QUALITY_UNCOMMON or Enum.ItemQuality.Uncommon) then -- TODO: 9.0
 				return false
 			end
 		end
