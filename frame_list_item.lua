@@ -303,6 +303,7 @@ function VladsVendorListItemMixin:SetItem(index)
 
 		item.canRefund = C_MerchantFrame.IsMerchantItemRefundable and C_MerchantFrame.IsMerchantItemRefundable(index)
 		item.link = GetMerchantItemLink(index)
+		item.quality = nil
 
 		if item.currencyID then
 			item.name, item.texture, item.numAvailable, item.quality = CurrencyContainerUtil.GetCurrencyContainerInfo(item.currencyID, item.numAvailable, item.name, item.texture, nil)
@@ -323,6 +324,8 @@ function VladsVendorListItemMixin:SetItem(index)
 			if not item.currencyID or not item.quality then
 				item.quality = quality or self:GetQualityIndexFromLink(item.link) or item.quality or 1
 			end
+
+			-- TODO: anima powers in vendor (spell id to quality color)
 
 			item.qualityColorR,
 			item.qualityColorG,
