@@ -1,3 +1,10 @@
+-- TODO: 9.1
+local LE_ITEM_CLASS_RECIPE = _G.LE_ITEM_CLASS_RECIPE or Enum.ItemClass.Recipe
+local LE_ITEM_CLASS_MISCELLANEOUS = _G.LE_ITEM_CLASS_MISCELLANEOUS or Enum.ItemClass.Miscellaneous
+local LE_ITEM_MISCELLANEOUS_MOUNT = _G.LE_ITEM_MISCELLANEOUS_MOUNT or Enum.ItemMiscellaneousSubclass.Mount
+local LE_ITEM_CLASS_BATTLEPET = _G.LE_ITEM_CLASS_BATTLEPET or Enum.ItemClass.Battlepet
+local LE_ITEM_MISCELLANEOUS_COMPANION_PET = _G.LE_ITEM_MISCELLANEOUS_COMPANION_PET or Enum.ItemMiscellaneousSubclass.CompanionPet
+
 VladsVendorListItemMethodsMixin = {}
 
 --[[ global ]] VladsVendorListItemMethodsMixin.CanLearnTextureTable = {
