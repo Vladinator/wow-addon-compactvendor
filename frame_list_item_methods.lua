@@ -64,7 +64,7 @@ function VladsVendorListItemMethodsMixin:CanAfford()
 end
 
 function VladsVendorListItemMethodsMixin:IsCurrency()
-	return item.currencyID
+	return self.currencyID
 end
 
 function VladsVendorListItemMethodsMixin:IsRecipe()

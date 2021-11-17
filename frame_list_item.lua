@@ -344,6 +344,7 @@ function VladsVendorListItemMixin:SetItem(index)
 		else
 			self:Show()
 		end
+		self.Quantity:SetEnabled(self:CanSelectQuantity())
 	else
 		self:Hide()
 	end
@@ -417,7 +418,15 @@ function VladsVendorListItemMixin:Update()
 	end
 end
 
+function VladsVendorListItemMixin:CanSelectQuantity()
+	-- local item = self:GetItem()
+	return true -- TODO: need to figure out if we can avoid tooltip scanning for this information
+end
+
 function VladsVendorListItemMixin:SelectQuantity()
+	if not self:CanSelectQuantity() then
+		return
+	end
 	self.Quantity:Click()
 end
 
@@ -436,13 +445,18 @@ function VladsVendorListItemMixin:RequiresConfirmation()
 	end
 	-- check if the item isn't refundable, or requires extra cost like currency or other items
 	local item = self:GetItem()
-	return not item:CanRefund() or item:HasRealExtendedCost() -- TODO: if we can refund do we really need a confirmation?
+	-- https://github.com/Gethe/wow-ui-source/blob/eca4d22da650b0ce775898ce31e708c4a6ee66f5/Interface/FrameXML/MerchantFrame.lua#L652
+	if GetMerchantItemCostInfo(item.index) == 0 and item:CanRefund() then
+		return not item.price or item.price < MERCHANT_HIGH_PRICE_COST
+	end
+	return item:HasRealExtendedCost()
 end
 
 function VladsVendorListItemMixin:Purchase(quantity, fromStackPopup)
 	local item = self:GetItem()
-	quantity = quantity or item.stackCount or 1
-
+	local stackCount = item.stackCount or 1
+	local maxStackCount = item.maxStackCount or 1
+	quantity = quantity or stackCount
 	if self:RequiresConfirmation() and (fromStackPopup ~= true or not item:CanRefund()) then
 		-- add this to mimic the merchant frame attributes onto our custom button
 		self:SetID(item.index)
@@ -463,8 +477,22 @@ function VladsVendorListItemMixin:Purchase(quantity, fromStackPopup)
 			end
 		end
 	else
-		-- TODO: can buy in bulk? Internal Bag Error could fix by sending the command in a for loop instead -- if quantity ~= item.stackCount then end
-		BuyMerchantItem(item.index, quantity)
+		if quantity > 1 and quantity ~= stackCount then
+			local maxSize = max(stackCount, maxStackCount)
+			local remaining = quantity
+			repeat
+				local maxCount = floor(remaining / maxSize)
+				if maxCount > 0 then
+					BuyMerchantItem(item.index, maxSize)
+					remaining = remaining - maxSize
+				else
+					BuyMerchantItem(item.index, remaining)
+					remaining = 0
+				end
+			until remaining < 1
+		else
+			BuyMerchantItem(item.index, quantity)
+		end
 	end
 end
 
