@@ -159,8 +159,13 @@ function VladsVendorListItemCostButtonMixin:Set(costType, item, parent, pool)
 
 					local itemNumAvailable = GetItemCount(itemLink, true, false)
 					if itemNumAvailable == 0 then
-						local currencyID = C_CurrencyInfo.GetCurrencyIDFromLink(itemLink)
-						if currencyID > 0 then
+						local currencyID
+						if C_CurrencyInfo.GetCurrencyIDFromLink then
+							currencyID = C_CurrencyInfo.GetCurrencyIDFromLink(itemLink)
+						else
+							-- TODO: classic
+						end
+						if currencyID and currencyID > 0 then
 							-- TODO: 9.0
 							if GetCurrencyInfo then
 								local _, currencyNumAvailable = GetCurrencyInfo(currencyID)

@@ -257,7 +257,9 @@ local RedTooltipColor = "FF2020"
 -- [arg1] 1 = reputation, 2 = profession, 3 = profession rank, 4 = already known
 -- [arg2] true = available, false = not available
 function VladsVendorListTooltipMixin:TooltipTextParse(text, color)
-	if text:find(TooltipTextPattern.Reputation) then
+	if not text then
+		return
+	elseif text:find(TooltipTextPattern.Reputation) then
 		return self.TooltipTextType.Reputation, color ~= RedTooltipColor
 	elseif text:find(TooltipTextPattern.Profession) then
 		return self.TooltipTextType.Profession, color ~= RedTooltipColor

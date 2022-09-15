@@ -503,7 +503,12 @@ function VladsVendorListItemMixin:SetBackgroundColor(colorIndex, fallback)
 		return false
 	end
 	self.backgroundColor = color
-	self.Bg:SetGradientAlpha("HORIZONTAL", color[1], color[2], color[3], color[4], color[5], color[6], color[7], color[8])
+	-- TODO: DF support
+	if self.Bg.SetGradientAlpha then
+		self.Bg:SetGradientAlpha("HORIZONTAL", color[1], color[2], color[3], color[4], color[5], color[6], color[7], color[8])
+	else
+		self.Bg:SetGradient("HORIZONTAL", { r = color[1], g = color[2], b = color[3], a = color[4] }, { r = color[5], g = color[6], b = color[7], a = color[8] })
+	end
 	return true
 end
 
