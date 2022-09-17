@@ -144,56 +144,57 @@ function VladsVendorListItemCostButtonMixin:Set(costType, item, parent, pool)
 		cost:Reset()
 
 		local itemCount = GetMerchantItemCostInfo(item.index)
-		local usedCurrencies = 0
 
-		if itemCount > 0 then
-			for i = 1, itemCount do -- MAX_ITEM_COST
-				local itemTexture, itemValue, itemLink, itemName = GetMerchantItemCostItem(item.index, i)
-
-				if itemTexture then
-					usedCurrencies = usedCurrencies + 1
-
-					if usedCurrencies > 1 then
-						cost = parent:PopFromPool(pool)
-					end
-
-					local itemNumAvailable = GetItemCount(itemLink, true, false)
-					if itemNumAvailable == 0 then
-						local currencyID
-						if C_CurrencyInfo.GetCurrencyIDFromLink then
-							currencyID = C_CurrencyInfo.GetCurrencyIDFromLink(itemLink)
-						else
-							-- TODO: classic
-						end
-						if currencyID and currencyID > 0 then
-							-- TODO: 9.0
-							if GetCurrencyInfo then
-								local _, currencyNumAvailable = GetCurrencyInfo(currencyID)
-								itemNumAvailable = currencyNumAvailable
-							else
-								local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(currencyID)
-								itemNumAvailable = currencyInfo.quantity
-							end
-						end
-					end
-
-					local text = itemValue > 1 and itemValue or "" -- FormatLargeNumber(itemValue)
-					cost:Reset(itemLink, item.price)
-					cost:SetAfford(itemNumAvailable - itemValue >= 0)
-					cost.Icon.Count:SetText(text)
-					cost.Icon.Texture:SetTexture(itemTexture)
-					cost.Icon:Show()
-					cost:Show()
-
-				else
-					return true, true
-				end
-			end
-
-			return usedCurrencies > 0
+		if not itemCount or itemCount < 1 then
+			return false
 		end
 
-		return false
+		local usedCurrencies = 0
+
+		for i = 1, itemCount do -- MAX_ITEM_COST
+			local itemTexture, itemValue, itemLink, itemName = GetMerchantItemCostItem(item.index, i)
+
+			if itemTexture then
+				usedCurrencies = usedCurrencies + 1
+
+				if usedCurrencies > 1 then
+					cost = parent:PopFromPool(pool)
+				end
+
+				local itemNumAvailable = GetItemCount(itemLink, true, false)
+				if itemNumAvailable == 0 then
+					local currencyID
+					if C_CurrencyInfo.GetCurrencyIDFromLink then
+						currencyID = C_CurrencyInfo.GetCurrencyIDFromLink(itemLink)
+					else
+						-- TODO: classic
+					end
+					if currencyID and currencyID > 0 then
+						-- TODO: 9.0
+						if GetCurrencyInfo then
+							local _, currencyNumAvailable = GetCurrencyInfo(currencyID)
+							itemNumAvailable = currencyNumAvailable
+						else
+							local currencyInfo = C_CurrencyInfo.GetCurrencyInfo(currencyID)
+							itemNumAvailable = currencyInfo.quantity
+						end
+					end
+				end
+
+				local text = itemValue > 1 and itemValue or "" -- FormatLargeNumber(itemValue)
+				cost:Reset(itemLink, item.price)
+				cost:SetAfford(itemNumAvailable - itemValue >= 0)
+				cost.Icon.Count:SetText(text)
+				cost.Icon.Texture:SetTexture(itemTexture)
+				cost.Icon:Show()
+				cost:Show()
+
+			else
+				return true, true
+			end
+		end
+
+		return usedCurrencies > 0
 	end
 
 	if costType == cost.Type.Money then
