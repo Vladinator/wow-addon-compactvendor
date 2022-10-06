@@ -180,6 +180,7 @@ local TooltipPool do
 
 	local function OnTooltipCreate(pool)
 		local tip = CreateFrame("GameTooltip", nil, WorldFrame)
+		if GameTooltipDataMixin then Mixin(tip, GameTooltipDataMixin) end -- TODO: DF
 		tip.textLeft, tip.textRight = {}, {}
 		for i = 1, 64 do
 			tip.textLeft[i], tip.textRight[i] = tip:CreateFontString(nil, nil, "GameFontNormal"), tip:CreateFontString(nil, nil, "GameFontNormal")
