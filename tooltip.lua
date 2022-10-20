@@ -167,6 +167,9 @@ end
 local TooltipPool do
 
 	local function OnTooltipSet(tip)
+		if tip.ignoreOnTooltipSetCallback ~= false then
+			return
+		end
 		for itemButton, _ in pairs(tip.itemButtons) do
 			local list = itemButton:GetList()
 			list:TriggerEvent(list.Event.Tooltip, itemButton, tip)
@@ -179,8 +182,7 @@ local TooltipPool do
 	end
 
 	local function OnTooltipCreate(pool)
-		local tip = CreateFrame("GameTooltip", "CompactVendorTooltip" .. (pool:GetNumActive() + 1), WorldFrame)
-		if GameTooltipDataMixin then Mixin(tip, GameTooltipDataMixin) end -- TODO: DF
+		local tip = CreateFrame("GameTooltip", "CompactVendorTooltip" .. (pool:GetNumActive() + 1), WorldFrame, TooltipDataProcessor and "GameTooltipTemplate" or nil) -- TODO: DF
 		tip.textLeft, tip.textRight = {}, {}
 		for i = 1, 64 do
 			tip.textLeft[i], tip.textRight[i] = tip:CreateFontString("$parentTextLeft" .. i, nil, "GameFontNormal"), tip:CreateFontString("$parentTextRight" .. i, nil, "GameFontNormal")
@@ -190,8 +192,14 @@ local TooltipPool do
 		tip.itemButtons = {}
 		tip.scanCount = 1
 		tip.updateCount = 0
-		tip:SetScript("OnTooltipSetItem", OnTooltipSet)
-		tip:SetScript("OnTooltipSetSpell", OnTooltipSet)
+		tip.ignoreOnTooltipSetCallback = false
+		if TooltipDataProcessor then -- TODO: DF
+			TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnTooltipSet)
+			TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Spell, OnTooltipSet)
+		else
+			tip:SetScript("OnTooltipSetItem", OnTooltipSet)
+			tip:SetScript("OnTooltipSetSpell", OnTooltipSet)
+		end
 		tip:SetOwner(WorldFrame, "ANCHOR_NONE")
 		return tip
 	end
@@ -309,8 +317,13 @@ VladsVendorListTooltipMixin.UseExperimentalScanning = true
 -- we create a tooltip by borrowing one from the TooltipPool and further modifying it to our application
 local InstantTip do
 	InstantTip = TooltipPool:Acquire()
-	InstantTip:SetScript("OnTooltipSetItem", nil)
-	InstantTip:SetScript("OnTooltipSetSpell", nil)
+
+	if TooltipDataProcessor then -- TODO: DF
+		InstantTip.ignoreOnTooltipSetCallback = true
+	else
+		InstantTip:SetScript("OnTooltipSetItem", nil)
+		InstantTip:SetScript("OnTooltipSetSpell", nil)
+	end
 
 	local TextLeft = InstantTip.textLeft
 	local TextRight = InstantTip.textRight

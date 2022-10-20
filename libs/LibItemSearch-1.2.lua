@@ -304,7 +304,7 @@ Lib.Filters.tipPhrases = {
 	keywords = {
 		[ITEM_SOULBOUND:lower()] = ITEM_BIND_ON_PICKUP,
 		[QUESTS_LABEL:lower()] = ITEM_BIND_QUEST,
-		[GetItemClassInfo(LE_ITEM_CLASS_QUESTITEM):lower()] = ITEM_BIND_QUEST,
+		[GetItemClassInfo(LE_ITEM_CLASS_QUESTITEM or Enum.ItemClass.Questitem):lower()] = ITEM_BIND_QUEST,
 		[PROFESSIONS_USED_IN_COOKING:lower()] = PROFESSIONS_USED_IN_COOKING,
 		[TOY:lower()] = TOY,
 
