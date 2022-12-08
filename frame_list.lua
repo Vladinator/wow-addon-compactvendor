@@ -85,7 +85,7 @@ function VladsVendorListMixin:RefreshListDisplay()
 	local numActiveButtons = 0
 	local height = buttons[1]:GetHeight()
 	local usedHeight = 0
-	local numMerchantItems = GetMerchantNumItems()
+	local numMerchantItems = VladsVendorDataProvider:GetSize()
 
 	local searchOffset = 0
 	local searchText = self:GetFrame().Search:GetText()
@@ -164,8 +164,8 @@ end
 function VladsVendorListMixin:GetSearchOffset(index, text)
 	local offset = 0
 	while true do
-		local link = GetMerchantItemLink(index + offset)
-		if not link or LibItemSearch:Matches(link, text) then
+		local itemData = VladsVendorDataProvider:GetMerchantItem(index + offset)
+		if (not itemData) or (not itemData.itemLink) or LibItemSearch:Matches(itemData.itemLink, text) then
 			break
 		end
 		offset = offset + 1

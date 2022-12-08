@@ -49,6 +49,31 @@ local function GetCurrencyContainerInfo(currencyID, numAvailable, name, texture,
     return CurrencyContainerUtil.GetCurrencyContainerInfo(currencyID, numAvailable, name, texture, quality) ---@diagnostic disable-line: undefined-global
 end
 
+local ItemQualityColorToHexColor = {} ---@type table<number, { r: number, g: number, b: number, hex: string }>
+local ItemHexColorToQualityIndex = {} ---@type table<string, number>
+for i = 0, 8 do
+    local r, g, b, hex = GetItemQualityColor(i)
+    ItemQualityColorToHexColor[i] = {
+        r = r,
+        g = g,
+        b = b,
+        hex = hex,
+    }
+    ItemHexColorToQualityIndex[hex] = i
+end
+
+---@param itemLink? string
+local function GetQualityIndexFromLink(itemLink)
+    if not itemLink then
+        return
+    end
+    local hex = itemLink:match("|c([%x]+)|")
+    if not hex then
+        return
+    end
+    return ItemHexColorToQualityIndex[hex]
+end
+
 ---@param index number
 function VladsVendorDataProviderItemDataMixin:Init(index)
     self.index = index
@@ -62,7 +87,7 @@ end
 function VladsVendorDataProviderItemDataMixin:Refresh()
     self.name, self.texture, self.price, self.stackCount, self.numAvailable, self.isPurchasable, self.isUsable, self.extendedCost, self.currencyID, self.spellID = GetMerchantItemInfo(self.index) ---@diagnostic disable-line: assign-type-mismatch
     if self.currencyID then
-        self.name, self.texture, self.numAvailable = GetCurrencyContainerInfo(self.currencyID, self.numAvailable, self.name, self.texture, nil)
+        self.name, self.texture, self.numAvailable, self.quality = GetCurrencyContainerInfo(self.currencyID, self.numAvailable, self.name, self.texture, nil)
     end
     self.canAfford = CanAffordMerchantItem(self.index) ---@diagnostic disable-line: assign-type-mismatch
     if self.extendedCost and self.price <= 0 then
@@ -89,6 +114,13 @@ function VladsVendorDataProviderItemDataMixin:Refresh()
     else
         self.availabilityType = AvailabilityType.AvailableAndUsable
     end
+    if not self.quality then
+        self.quality = GetQualityIndexFromLink(self.itemLink)
+    end
+end
+
+function VladsVendorDataProviderItemDataMixin:GetIndex()
+    return self.index
 end
 
 ---@param index number
@@ -98,7 +130,7 @@ local function CreateMerchantItem(index)
     return itemData
 end
 
----@alias CallbackRegistryCallbackFunc fun(owner: number)
+---@alias CallbackRegistryCallbackFunc fun(owner: number, ...: any)
 
 ---@class CallbackRegistryCallbackHandle
 ---@field public Unregister fun()
@@ -123,7 +155,7 @@ end
 
 ---@alias DataProviderForEach fun(itemData: DataProviderItemData)
 
----@alias DataProviderEvent "OnMerchantShow"|"OnMerchantHide"|"OnMerchantReady"
+---@alias DataProviderEvent "OnMerchantShow"|"OnMerchantHide"|"OnMerchantReady"|"OnMerchantFilter"
 
 ---@class DataProvider : CallbackRegistry
 ---@field public Event table<DataProviderEvent, number>
@@ -160,6 +192,7 @@ VladsVendorDataProvider:GenerateCallbackEvents({
     "OnMerchantShow",
     "OnMerchantHide",
     "OnMerchantReady",
+    "OnMerchantFilter",
 })
 
 ---@return boolean merchantExists, boolean sameMerchant
@@ -183,9 +216,10 @@ function VladsVendorDataProvider:GetMerchantInfo()
     return self.guid, self.name
 end
 
-function VladsVendorDataProvider:UpdateMerchant()
+---@param forceFullUpdate? boolean
+function VladsVendorDataProvider:UpdateMerchant(forceFullUpdate)
     local merchantExists, sameMerchant = self:UpdateMerchantInfo()
-    if sameMerchant then
+    if sameMerchant and forceFullUpdate ~= true then
         return
     end
     self:Flush()
@@ -272,15 +306,38 @@ function VladsVendorDataProvider:GetMerchantItem(index)
     return self.collection[index]
 end
 
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("MERCHANT_SHOW")
-frame:RegisterEvent("MERCHANT_CLOSED")
-frame:RegisterEvent("MERCHANT_UPDATE")
-frame:RegisterEvent("MERCHANT_FILTER_ITEM_UPDATE")
-frame:RegisterEvent("HEIRLOOMS_UPDATED")
-frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-frame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
-frame:SetScript("OnEvent", function(_, event, ...)
+function VladsVendorDataProvider:HasMerchantItems()
+    return self.collection[1] and true or false
+end
+
+function VladsVendorDataProvider:GetNumMerchantItems()
+    return self:GetSize()
+end
+
+---@enum MerchantFilterEnum
+VladsVendorDataProvider.Filter = {
+    LE_LOOT_FILTER_RESET = 0, -- custom
+    LE_LOOT_FILTER_ALL = 1,
+    LE_LOOT_FILTER_CLASS = 2,
+    LE_LOOT_FILTER_SPEC1 = 3,
+    LE_LOOT_FILTER_SPEC2 = 4,
+    LE_LOOT_FILTER_SPEC3 = 5,
+    LE_LOOT_FILTER_SPEC4 = 6,
+    LE_LOOT_FILTER_BOE = 7,
+}
+
+---@param filter MerchantFilterEnum
+hooksecurefunc("SetMerchantFilter", function(filter)
+    VladsVendorDataProvider:TriggerEvent(VladsVendorDataProvider.Event.OnMerchantFilter, filter)
+    VladsVendorDataProvider:UpdateMerchant(true)
+end)
+
+hooksecurefunc("ResetSetMerchantFilter", function()
+    VladsVendorDataProvider:TriggerEvent(VladsVendorDataProvider.Event.OnMerchantFilter, VladsVendorDataProvider.Filter.LE_LOOT_FILTER_RESET)
+    VladsVendorDataProvider:UpdateMerchant(true)
+end)
+
+local function OnEvent(_, event, ...)
     if event == "MERCHANT_SHOW" then
         VladsVendorDataProvider:UpdateMerchant()
         VladsVendorDataProvider:UpdateMerchantPendingItems()
@@ -307,10 +364,19 @@ frame:SetScript("OnEvent", function(_, event, ...)
             VladsVendorDataProvider:UpdateMerchantStockItems()
         end
     end
-end)
+end
+
+local frame = CreateFrame("Frame")
+frame:SetScript("OnEvent", OnEvent)
+frame:RegisterEvent("MERCHANT_SHOW")
+frame:RegisterEvent("MERCHANT_CLOSED")
+frame:RegisterEvent("MERCHANT_UPDATE")
+frame:RegisterEvent("MERCHANT_FILTER_ITEM_UPDATE")
+frame:RegisterEvent("HEIRLOOMS_UPDATED")
+frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+frame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
 
 -- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantShow, function() print("Show") end)
 -- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantHide, function() print("Hide") end)
+-- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantFilter, function(_, filter) print("Filter", filter) end)
 -- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantReady, function() print("Ready") local items = VladsVendorDataProvider:GetMerchantItems() if items then for index, itemData in ipairs(items) do print(index, itemData.index, itemData.itemLink, itemData.costType, itemData.availabilityType, "") end end end)
-
--- TODO: handle filter changes in the native API (we want to keep our inventory but flag the items filtered natively in some way...)

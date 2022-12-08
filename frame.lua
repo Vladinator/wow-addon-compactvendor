@@ -31,6 +31,9 @@ function VladsVendorFrameMixin:OnLoad()
 	Hide(MerchantNextPageButton)
 	Hide(MerchantPrevPageButton)
 	Hide(MerchantPageText)
+
+	VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantReady, function() local list = self:GetList() local scrollFrame = list.ListScrollFrame local buttons = scrollFrame.buttons if buttons then list:RefreshListDisplay() end end)
+
 end
 
 function VladsVendorFrameMixin:OnEvent(event, ...)

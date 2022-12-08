@@ -283,6 +283,7 @@ function VladsVendorListItemMixin:HasItem()
 	return self.item.exists
 end
 
+---@param index number
 function VladsVendorListItemMixin:SetItem(index)
 	local item = self.item
 
@@ -290,7 +291,9 @@ function VladsVendorListItemMixin:SetItem(index)
 	item.guid = nil
 	item.index = index
 
-	if index > 0 then
+	local itemData = VladsVendorDataProvider:GetMerchantItem(index)
+
+	if itemData then
 		item.name,
 		item.texture,
 		item.price,
@@ -299,15 +302,11 @@ function VladsVendorListItemMixin:SetItem(index)
 		item.isPurchasable,
 		item.isUsable,
 		item.extendedCost,
-		item.currencyID = GetMerchantItemInfo(index)
+		item.currencyID = itemData.name, itemData.texture, itemData.price, itemData.stackCount, itemData.numAvailable, itemData.isPurchasable, itemData.isUsable, itemData.extendedCost, itemData.currencyID
 
-		item.canRefund = C_MerchantFrame.IsMerchantItemRefundable and C_MerchantFrame.IsMerchantItemRefundable(index)
-		item.link = GetMerchantItemLink(index)
-		item.quality = nil
-
-		if item.currencyID then
-			item.name, item.texture, item.numAvailable, item.quality = CurrencyContainerUtil.GetCurrencyContainerInfo(item.currencyID, item.numAvailable, item.name, item.texture, nil)
-		end
+		item.canRefund = itemData.canRefund
+		item.link = itemData.itemLink
+		item.quality = itemData.quality
 
 		if item.link then
 			item.id,
