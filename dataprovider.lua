@@ -13,7 +13,7 @@ local AvailabilityType = {
     AvailableAndUsable = 4,
 }
 
----@class VladsVendorDataProviderElementDataMixin
+---@class VladsVendorDataProviderItemDataMixin
 ---@field public index number
 ---@field public name? string
 ---@field public texture string|number
@@ -36,8 +36,8 @@ local AvailabilityType = {
 ---@field public availabilityType AvailabilityTypeEnum
 ---@field public canRefund boolean
 
----@class VladsVendorDataProviderElementDataMixin
-local VladsVendorDataProviderElementDataMixin = {}
+---@class VladsVendorDataProviderItemDataMixin
+local VladsVendorDataProviderItemDataMixin = {}
 
 ---@param currencyID number
 ---@param numAvailable number
@@ -50,12 +50,16 @@ local function GetCurrencyContainerInfo(currencyID, numAvailable, name, texture,
 end
 
 ---@param index number
-function VladsVendorDataProviderElementDataMixin:Init(index)
+function VladsVendorDataProviderItemDataMixin:Init(index)
     self.index = index
     self:Refresh()
 end
 
-function VladsVendorDataProviderElementDataMixin:Refresh()
+function VladsVendorDataProviderItemDataMixin:IsPending()
+    return not self.itemLink
+end
+
+function VladsVendorDataProviderItemDataMixin:Refresh()
     self.name, self.texture, self.price, self.stackCount, self.numAvailable, self.isPurchasable, self.isUsable, self.extendedCost, self.currencyID, self.spellID = GetMerchantItemInfo(self.index) ---@diagnostic disable-line: assign-type-mismatch
     if self.currencyID then
         self.name, self.texture, self.numAvailable = GetCurrencyContainerInfo(self.currencyID, self.numAvailable, self.name, self.texture, nil)
@@ -89,43 +93,61 @@ end
 
 ---@param index number
 local function CreateMerchantItem(index)
-    local elementData = Mixin({}, VladsVendorDataProviderElementDataMixin)
-    elementData:Init(index)
-    return elementData
+    local itemData = Mixin({}, VladsVendorDataProviderItemDataMixin)
+    itemData:Init(index)
+    return itemData
 end
 
----@alias DataProviderElementData VladsVendorDataProviderElementDataMixin
+---@alias CallbackRegistryCallbackFunc fun(owner: number)
 
----@alias DataProviderEnumerator fun(table: DataProviderElementData[], i?: number): number, DataProviderElementData
+---@class CallbackRegistryCallbackHandle
+---@field public Unregister fun()
 
----@alias DataProviderPredicate fun(elementData: DataProviderElementData): boolean?
+---@class CallbackRegistry
+---@field public SetUndefinedEventsAllowed fun(self: CallbackRegistry, allowed: boolean)
+---@field public HasRegistrantsForEvent fun(self: CallbackRegistry, event: string|number): boolean
+---@field public SecureInsertEvent fun(self: CallbackRegistry, event: string|number)
+---@field public RegisterCallback fun(self: CallbackRegistry, event: string|number, func: CallbackRegistryCallbackFunc, owner: string|nil, ...: any)
+---@field public RegisterCallbackWithHandle fun(self: CallbackRegistry, event: string|number, func: CallbackRegistryCallbackFunc, owner: string|nil, ...: any): CallbackRegistryCallbackHandle
+---@field public TriggerEvent fun(self: CallbackRegistry, event: string|number, ...: any)
+---@field public UnregisterCallback fun(self: CallbackRegistry, event: string|number, owner: string|number)
+---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: DataProviderEvent[])
 
----@alias DataProviderSortComparator fun(a: DataProviderElementData, b: DataProviderElementData): boolean
+---@alias DataProviderItemData VladsVendorDataProviderItemDataMixin
 
----@alias DataProviderForEach fun(elementData: DataProviderElementData)
+---@alias DataProviderEnumerator fun(table: DataProviderItemData[], i?: number): number, DataProviderItemData
 
----@class DataProvider
----@field public collection DataProviderElementData[]
+---@alias DataProviderPredicate fun(itemData: DataProviderItemData): boolean?
+
+---@alias DataProviderSortComparator fun(a: DataProviderItemData, b: DataProviderItemData): boolean
+
+---@alias DataProviderForEach fun(itemData: DataProviderItemData)
+
+---@alias DataProviderEvent "OnMerchantShow"|"OnMerchantHide"|"OnMerchantReady"
+
+---@class DataProvider : CallbackRegistry
+---@field public Event table<DataProviderEvent, number>
+---@field public collection DataProviderItemData[]
 ---@field public sortComparator? DataProviderSortComparator
----@field public Init fun(self: DataProvider, tbl?: DataProviderElementData[])
+---@field public Init fun(self: DataProvider, tbl?: DataProviderItemData[])
 ---@field public Enumerate fun(self: DataProvider, indexBegin?: number, indexEnd?: number): DataProviderEnumerator
 ---@field public GetSize fun(self: DataProvider): number
 ---@field public IsEmpty fun(self: DataProvider): boolean
----@field public InsertInternal fun(self: DataProvider, elementData: DataProviderElementData, hasSortComparator: boolean)
----@field public Insert fun(self: DataProvider, ...: DataProviderElementData)
----@field public InsertTable fun(self: DataProvider, tbl: DataProviderElementData[])
----@field public InsertTableRange fun(self: DataProvider, tbl: DataProviderElementData[], indexBegin: number, indexEnd: number)
----@field public Remove fun(self: DataProvider, ...: DataProviderElementData): removedIndex: number
+---@field public InsertInternal fun(self: DataProvider, itemData: DataProviderItemData, hasSortComparator: boolean)
+---@field public Insert fun(self: DataProvider, ...: DataProviderItemData)
+---@field public InsertTable fun(self: DataProvider, tbl: DataProviderItemData[])
+---@field public InsertTableRange fun(self: DataProvider, tbl: DataProviderItemData[], indexBegin: number, indexEnd: number)
+---@field public Remove fun(self: DataProvider, ...: DataProviderItemData): removedIndex: number
 ---@field public RemoveByPredicate fun(self: DataProvider, predicate: DataProviderPredicate)
 ---@field public RemoveIndex fun(self: DataProvider, index: number)
 ---@field public RemoveIndexRange fun(self: DataProvider, indexBegin: number, indexEnd: number)
 ---@field public SetSortComparator fun(self: DataProvider, sortComparator: DataProviderSortComparator, skipSort: boolean)
 ---@field public HasSortComparator fun(self: DataProvider): boolean
 ---@field public Sort fun(self: DataProvider)
----@field public Find fun(self: DataProvider, index: number): elementData: DataProviderElementData?
----@field public FindIndex fun(self: DataProvider, elementData: DataProviderElementData): index: number?, elementDataIter: DataProviderEnumerator?
----@field public FindByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): index: number?, elementData: DataProviderElementData?
----@field public FindElementDataByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): elementData: DataProviderElementData?
+---@field public Find fun(self: DataProvider, index: number): itemData: DataProviderItemData?
+---@field public FindIndex fun(self: DataProvider, itemData: DataProviderItemData): index: number?, itemDataIter: DataProviderEnumerator?
+---@field public FindByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): index: number?, itemData: DataProviderItemData?
+---@field public FindElementDataByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): itemData: DataProviderItemData?
 ---@field public FindIndexByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): index: number?
 ---@field public ContainsByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): boolean
 ---@field public ForEach fun(self: DataProvider, func: DataProviderForEach)
@@ -134,12 +156,26 @@ end
 ---@diagnostic disable-next-line: undefined-global
 --[[ global ]] VladsVendorDataProvider = CreateDataProvider() ---@class DataProvider
 
+VladsVendorDataProvider:GenerateCallbackEvents({
+    "OnMerchantShow",
+    "OnMerchantHide",
+    "OnMerchantReady",
+})
+
 ---@return boolean merchantExists, boolean sameMerchant
 function VladsVendorDataProvider:UpdateMerchantInfo()
     local guid = self.guid
     self.guid = UnitGUID("npc")
     self.name = UnitName("npc")
-    return not not self.guid, self.guid == guid
+    local merchantExists = not not self.guid
+    local sameMerchant = self.guid == guid
+    if merchantExists and not sameMerchant then
+        self.isReady = false
+        self:TriggerEvent(self.Event.OnMerchantShow)
+    elseif not merchantExists then
+        self:TriggerEvent(self.Event.OnMerchantHide)
+    end
+    return merchantExists, sameMerchant
 end
 
 ---@return string guid, string name
@@ -157,26 +193,72 @@ function VladsVendorDataProvider:UpdateMerchant()
         return
     end
     local numMerchantItems = GetMerchantNumItems()
-    local collection = {} ---@type DataProviderElementData[]
+    local collection = {} ---@type DataProviderItemData[]
     for index = 1, numMerchantItems do
-        local elementData = CreateMerchantItem(index)
-        collection[index] = elementData
+        local itemData = CreateMerchantItem(index)
+        collection[index] = itemData
     end
     self:InsertTable(collection)
 end
 
+function VladsVendorDataProvider:UpdateMerchantPendingItems()
+    local pending = 0
+    for _, itemData in self:Enumerate() do
+        if itemData:IsPending() then
+            pending = pending + 1
+            itemData:Refresh()
+            if not itemData:IsPending() then
+                pending = pending - 1
+            end
+        end
+    end
+    if pending == 0 and not self.isReady then
+        self.isReady = true
+        self:TriggerEvent(self.Event.OnMerchantReady)
+    end
+end
+
+---@param itemID number
+function VladsVendorDataProvider:UpdateMerchantItemByID(itemID)
+    local items = self:GetMerchantItems(function(itemData)
+        return itemData.merchantItemID == itemID
+    end)
+    if not items then
+        return
+    end
+    for _, itemData in ipairs(items) do
+        itemData:Refresh()
+    end
+end
+
+function VladsVendorDataProvider:UpdateMerchantStockItems()
+    local items = self:GetMerchantItems()
+    if not items then
+        return
+    end
+    for _, itemData in ipairs(items) do
+        if itemData.numAvailable ~= -1 then
+            itemData:Refresh()
+        end
+    end
+end
+
 ---@param predicate? DataProviderPredicate
----@return DataProviderElementData[]? merchantItems
+---@return DataProviderItemData[]? merchantItems
 function VladsVendorDataProvider:GetMerchantItems(predicate)
     if not predicate then
-        return self.collection
+        local collection = self.collection
+        if collection[1] then
+            return collection
+        end
+        return
     end
-    local collection = {} ---@type DataProviderElementData
+    local collection = {} ---@type DataProviderItemData
     local index = 0
-    for _, elementData in self:Enumerate() do
-        if predicate(elementData) then
+    for _, itemData in self:Enumerate() do
+        if predicate(itemData) then
             index = index + 1
-            collection[index] = elementData
+            collection[index] = itemData
         end
     end
     if index > 0 then
@@ -185,27 +267,50 @@ function VladsVendorDataProvider:GetMerchantItems(predicate)
 end
 
 ---@param index number
----@return DataProviderElementData? elementData
+---@return DataProviderItemData? itemData
 function VladsVendorDataProvider:GetMerchantItem(index)
     return self.collection[index]
 end
 
 local frame = CreateFrame("Frame")
-frame:RegisterEvent("ITEM_DATA_LOAD_RESULT")
+frame:RegisterEvent("MERCHANT_SHOW")
+frame:RegisterEvent("MERCHANT_CLOSED")
+frame:RegisterEvent("MERCHANT_UPDATE")
+frame:RegisterEvent("MERCHANT_FILTER_ITEM_UPDATE")
+frame:RegisterEvent("HEIRLOOMS_UPDATED")
 frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-frame:SetScript("OnEvent", function(_, event, itemID, success)
-    if event ~= "ITEM_DATA_LOAD_RESULT" and event ~= "GET_ITEM_INFO_RECEIVED" then
-        return
-    end
-    if not success then
-        return
-    end
-    if VladsVendorDataProvider:IsEmpty() then
-        return
-    end
-    for _, elementData in pairs(VladsVendorDataProvider.collection) do
-        if elementData.merchantItemID == itemID then
-            elementData:Refresh()
+frame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+frame:SetScript("OnEvent", function(_, event, ...)
+    if event == "MERCHANT_SHOW" then
+        VladsVendorDataProvider:UpdateMerchant()
+        VladsVendorDataProvider:UpdateMerchantPendingItems()
+    elseif event == "MERCHANT_CLOSED" then
+        VladsVendorDataProvider:UpdateMerchant()
+    elseif event == "MERCHANT_UPDATE" then
+        VladsVendorDataProvider:UpdateMerchantPendingItems()
+    elseif event == "MERCHANT_FILTER_ITEM_UPDATE" then
+        local itemID = ...
+        VladsVendorDataProvider:UpdateMerchantItemByID(itemID)
+    elseif event == "HEIRLOOMS_UPDATED" then
+        local itemID, updateReason = ...
+        if itemID and updateReason == "NEW" then
+            VladsVendorDataProvider:UpdateMerchantItemByID(itemID)
+        end
+    elseif event == "GET_ITEM_INFO_RECEIVED" then
+        local itemID, success = ...
+        if success then
+            VladsVendorDataProvider:UpdateMerchantItemByID(itemID)
+        end
+    elseif event == "UNIT_INVENTORY_CHANGED" then
+        local unit = ...
+        if unit == "player" then
+            VladsVendorDataProvider:UpdateMerchantStockItems()
         end
     end
 end)
+
+-- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantShow, function() print("Show") end)
+-- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantHide, function() print("Hide") end)
+-- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantReady, function() print("Ready") local items = VladsVendorDataProvider:GetMerchantItems() if items then for index, itemData in ipairs(items) do print(index, itemData.index, itemData.itemLink, itemData.costType, itemData.availabilityType, "") end end end)
+
+-- TODO: handle filter changes in the native API (we want to keep our inventory but flag the items filtered natively in some way...)
