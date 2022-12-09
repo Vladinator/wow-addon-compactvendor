@@ -49,7 +49,13 @@ local function GetCurrencyContainerInfo(currencyID, numAvailable, name, texture,
     return CurrencyContainerUtil.GetCurrencyContainerInfo(currencyID, numAvailable, name, texture, quality) ---@diagnostic disable-line: undefined-global
 end
 
-local ItemQualityColorToHexColor = {} ---@type table<number, { r: number, g: number, b: number, hex: string }>
+---@class SimpleColor
+---@field public r number
+---@field public g number
+---@field public b number
+---@field public hex string
+
+local ItemQualityColorToHexColor = {} ---@type table<number, SimpleColor>
 local ItemHexColorToQualityIndex = {} ---@type table<string, number>
 for i = 0, 8 do
     local r, g, b, hex = GetItemQualityColor(i)
@@ -62,8 +68,18 @@ for i = 0, 8 do
     ItemHexColorToQualityIndex[hex] = i
 end
 
+---@param quality? number
+---@return SimpleColor? color
+local function GetColorFromQuality(quality)
+    if not quality then
+        return
+    end
+    return ItemQualityColorToHexColor[quality]
+end
+
 ---@param itemLink? string
-local function GetQualityIndexFromLink(itemLink)
+---@return number? quality
+local function GetQualityFromLink(itemLink)
     if not itemLink then
         return
     end
@@ -115,7 +131,7 @@ function VladsVendorDataProviderItemDataMixin:Refresh()
         self.availabilityType = AvailabilityType.AvailableAndUsable
     end
     if not self.quality then
-        self.quality = GetQualityIndexFromLink(self.itemLink)
+        self.quality = GetQualityFromLink(self.itemLink)
     end
 end
 
