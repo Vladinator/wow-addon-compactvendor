@@ -85,7 +85,8 @@ function VladsVendorListMixin:RefreshListDisplay()
 	local numActiveButtons = 0
 	local height = buttons[1]:GetHeight()
 	local usedHeight = 0
-	local numMerchantItems = VladsVendorDataProvider:GetSize()
+	local merchantItems = VladsVendorDataProvider:GetMerchantItems()
+	local numMerchantItems = #merchantItems
 
 	local searchOffset = 0
 	local searchText = self:GetFrame().Search:GetText()
@@ -107,9 +108,9 @@ function VladsVendorListMixin:RefreshListDisplay()
 
 		if displayIndex <= numMerchantItems then
 			usedHeight = usedHeight + height
-			button:SetItem(displayIndex)
+			button:SetItem(merchantItems[displayIndex])
 		else
-			button:SetItem(0)
+			button:SetItem()
 		end
 
 		numActiveButtons = numActiveButtons + 1

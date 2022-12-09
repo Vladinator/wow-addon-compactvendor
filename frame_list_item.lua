@@ -212,6 +212,9 @@ function VladsVendorListItemMixin:OnEnter()
 		return
 	end
 	local item = self:GetItem()
+	if not item.index then
+		return
+	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 	GameTooltip:SetMerchantItem(item.index)
 	GameTooltip_ShowCompareItem()
@@ -283,17 +286,16 @@ function VladsVendorListItemMixin:HasItem()
 	return self.item.exists
 end
 
----@param index number
-function VladsVendorListItemMixin:SetItem(index)
+---@param itemData VladsVendorDataProviderItemDataMixin
+function VladsVendorListItemMixin:SetItem(itemData)
+	local index = itemData and itemData.index
 	local item = self.item
 
 	item.exists = false
 	item.guid = nil
 	item.index = index
 
-	local itemData = VladsVendorDataProvider:GetMerchantItem(index)
-
-	if itemData then
+	if index then
 		item.name,
 		item.texture,
 		item.price,

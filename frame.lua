@@ -32,7 +32,17 @@ function VladsVendorFrameMixin:OnLoad()
 	Hide(MerchantPrevPageButton)
 	Hide(MerchantPageText)
 
-	VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantReady, function() local list = self:GetList() local scrollFrame = list.ListScrollFrame local buttons = scrollFrame.buttons if buttons then list:RefreshListDisplay() end end)
+	-- use the new data provider to get notified when the merchant update occurs, and is ready, to then update and refresh the list frame
+	local refresh = function(_, isReady)
+		if isReady == false then return end
+		local list = self:GetList()
+		local scrollFrame = list.ListScrollFrame
+		local buttons = scrollFrame.buttons
+		if not buttons then return end
+		list:RefreshListDisplay()
+	end
+	VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantUpdate, refresh)
+	VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantUpdateFilters, refresh)
 
 end
 

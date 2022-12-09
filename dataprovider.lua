@@ -96,6 +96,7 @@ function VladsVendorDataProviderItemDataMixin:Init(index)
     self:Refresh()
 end
 
+---@return boolean isPending
 function VladsVendorDataProviderItemDataMixin:IsPending()
     return not self.itemLink
 end
@@ -135,8 +136,19 @@ function VladsVendorDataProviderItemDataMixin:Refresh()
     end
 end
 
+---@return number index
 function VladsVendorDataProviderItemDataMixin:GetIndex()
     return self.index
+end
+
+---@return boolean isFiltered
+function VladsVendorDataProviderItemDataMixin:IsFiltered()
+    return not not self.isFiltered
+end
+
+---@param isFiltered boolean
+function VladsVendorDataProviderItemDataMixin:SetFiltered(isFiltered)
+    self.isFiltered = isFiltered
 end
 
 ---@param index number
@@ -171,7 +183,7 @@ end
 
 ---@alias DataProviderForEach fun(itemData: DataProviderItemData)
 
----@alias DataProviderEvent "OnMerchantShow"|"OnMerchantHide"|"OnMerchantReady"|"OnMerchantFilter"
+---@alias DataProviderEvent "OnMerchantShow"|"OnMerchantHide"|"OnMerchantReady"|"OnMerchantFilter"|"OnMerchantUpdate"|"OnMerchantUpdateFilters"
 
 ---@class DataProvider : CallbackRegistry
 ---@field public Event table<DataProviderEvent, number>
@@ -201,6 +213,9 @@ end
 ---@field public ForEach fun(self: DataProvider, func: DataProviderForEach)
 ---@field public Flush fun(self: DataProvider)
 
+---@class DataProviderFilter
+---@field public IsFiltered fun(self: DataProviderFilter, itemData: DataProviderItemData): boolean?
+
 ---@diagnostic disable-next-line: undefined-global
 --[[ global ]] VladsVendorDataProvider = CreateDataProvider() ---@class DataProvider
 
@@ -209,6 +224,8 @@ VladsVendorDataProvider:GenerateCallbackEvents({
     "OnMerchantHide",
     "OnMerchantReady",
     "OnMerchantFilter",
+    "OnMerchantUpdate",
+    "OnMerchantUpdateFilters",
 })
 
 ---@return boolean merchantExists, boolean sameMerchant
@@ -249,6 +266,7 @@ function VladsVendorDataProvider:UpdateMerchant(forceFullUpdate)
         collection[index] = itemData
     end
     self:InsertTable(collection)
+    self:TriggerEvent(self.Event.OnMerchantUpdate, self.isReady)
 end
 
 function VladsVendorDataProvider:UpdateMerchantPendingItems()
@@ -265,13 +283,14 @@ function VladsVendorDataProvider:UpdateMerchantPendingItems()
     if pending == 0 and not self.isReady then
         self.isReady = true
         self:TriggerEvent(self.Event.OnMerchantReady)
+        self:TriggerEvent(self.Event.OnMerchantUpdate, self.isReady)
     end
 end
 
 ---@param itemID number
 function VladsVendorDataProvider:UpdateMerchantItemByID(itemID)
     local items = self:GetMerchantItems(function(itemData)
-        return itemData.merchantItemID == itemID
+        return itemData.merchantItemID == itemID and not itemData:IsFiltered()
     end)
     if not items then
         return
@@ -293,20 +312,22 @@ function VladsVendorDataProvider:UpdateMerchantStockItems()
     end
 end
 
----@param predicate? DataProviderPredicate
+---@param itemData DataProviderItemData
+local function FilterPredicate(itemData)
+    return not itemData:IsFiltered()
+end
+
+---@param predicate DataProviderPredicate|true|nil
 ---@return DataProviderItemData[]? merchantItems
 function VladsVendorDataProvider:GetMerchantItems(predicate)
-    if not predicate then
-        local collection = self.collection
-        if collection[1] then
-            return collection
-        end
-        return
+    if predicate == true then
+    elseif type(predicate) ~= "function" then
+        predicate = FilterPredicate
     end
     local collection = {} ---@type DataProviderItemData
     local index = 0
     for _, itemData in self:Enumerate() do
-        if predicate(itemData) then
+        if predicate == true or predicate(itemData) then
             index = index + 1
             collection[index] = itemData
         end
@@ -328,6 +349,27 @@ end
 
 function VladsVendorDataProvider:GetNumMerchantItems()
     return self:GetSize()
+end
+
+---@param filters DataProviderFilter[]
+function VladsVendorDataProvider:ApplyFilters(filters)
+    local items = self:GetMerchantItems(true)
+    if not items then
+        return
+    end
+    for _, itemData in ipairs(items) do
+        local isFiltered = false
+        if not itemData:IsPending() then
+            for _, filter in pairs(filters) do
+                if filter:IsFiltered(itemData) then
+                    isFiltered = true
+                    break
+                end
+            end
+        end
+        itemData:SetFiltered(isFiltered)
+    end
+    self:TriggerEvent(self.Event.OnMerchantUpdateFilters)
 end
 
 ---@enum MerchantFilterEnum
@@ -395,4 +437,5 @@ frame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
 -- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantShow, function() print("Show") end)
 -- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantHide, function() print("Hide") end)
 -- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantFilter, function(_, filter) print("Filter", filter) end)
--- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantReady, function() print("Ready") local items = VladsVendorDataProvider:GetMerchantItems() if items then for index, itemData in ipairs(items) do print(index, itemData.index, itemData.itemLink, itemData.costType, itemData.availabilityType, "") end end end)
+-- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantReady, function() print("Ready", VladsVendorDataProvider:GetMerchantItems(), VladsVendorDataProvider:GetNumMerchantItems()) end)
+-- VladsVendorDataProvider:RegisterCallback(VladsVendorDataProvider.Event.OnMerchantUpdate, function(_, isReady) print("Update", isReady, VladsVendorDataProvider:GetMerchantItems(), VladsVendorDataProvider:GetNumMerchantItems()) end)
