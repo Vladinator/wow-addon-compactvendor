@@ -292,9 +292,6 @@ function VladsVendorDataProvider:UpdateMerchantItemByID(itemID)
     local items = self:GetMerchantItems(function(itemData)
         return itemData.merchantItemID == itemID and not itemData:IsFiltered()
     end)
-    if not items then
-        return
-    end
     for _, itemData in ipairs(items) do
         itemData:Refresh()
     end
@@ -302,9 +299,6 @@ end
 
 function VladsVendorDataProvider:UpdateMerchantStockItems()
     local items = self:GetMerchantItems()
-    if not items then
-        return
-    end
     for _, itemData in ipairs(items) do
         if itemData.numAvailable ~= -1 then
             itemData:Refresh()
@@ -318,7 +312,7 @@ local function FilterPredicate(itemData)
 end
 
 ---@param predicate DataProviderPredicate|true|nil
----@return DataProviderItemData[]? merchantItems
+---@return DataProviderItemData[] merchantItems
 function VladsVendorDataProvider:GetMerchantItems(predicate)
     if predicate == true then
     elseif type(predicate) ~= "function" then
@@ -332,9 +326,7 @@ function VladsVendorDataProvider:GetMerchantItems(predicate)
             collection[index] = itemData
         end
     end
-    if index > 0 then
-        return collection
-    end
+    return collection
 end
 
 ---@param index number
@@ -354,9 +346,6 @@ end
 ---@param filters DataProviderFilter[]
 function VladsVendorDataProvider:ApplyFilters(filters)
     local items = self:GetMerchantItems(true)
-    if not items then
-        return
-    end
     for _, itemData in ipairs(items) do
         local isFiltered = false
         if not itemData:IsPending() then
