@@ -13,6 +13,9 @@ local DressUpBattlePetLink = DressUpBattlePetLink ---@type fun(itemLink: string)
 local DressUpMountLink = DressUpMountLink ---@type fun(itemLink: string): boolean
 local MerchantFrame_ConfirmExtendedItemCost = MerchantFrame_ConfirmExtendedItemCost ---@type fun(self: Region, quantity: number)
 local StaticPopup_Visible = StaticPopup_Visible ---@type fun(name: string): any, any
+local CreateObjectPool = CreateObjectPool ---@type ObjectPoolFunction
+local CreateFramePool = CreateFramePool ---@type FramePoolFunction
+local CallbackRegistryMixin = CallbackRegistryMixin ---@type CallbackRegistry
 local FrameUtil = FrameUtil ---@type table<any, any>
 local MathUtil = MathUtil ---@type table<any, any>
 local ScrollUtil = ScrollUtil ---@type table<any, any>
@@ -239,7 +242,7 @@ local UpdateMerchantItemButton do
     ---@field public itemID? number
 
     ---@class MerchantItem
-    ---@field public parent MerchantDataProvider
+    ---@field public parent MerchantScanner
     ---@field public name? string
     ---@field public texture number|string
     ---@field public price number
@@ -274,13 +277,50 @@ local UpdateMerchantItemButton do
 
     local MerchantItem = {} ---@class MerchantItem
 
-    ---@param parent MerchantDataProvider
+    ---@param parent MerchantScanner
     ---@param index number
     function MerchantItem:OnLoad(parent, index)
         self.parent = parent
         self.index = index
         self.extendedCostItems = {}
         self:Refresh()
+    end
+
+    ---@param tbl table
+    local function ResetTableContents(tbl)
+        for k, v in pairs(tbl) do
+            if type(v) == "number" then
+                tbl[k] = 0
+            elseif type(v) ~= "table" then
+                tbl[k] = nil
+            end
+        end
+    end
+
+    function MerchantItem:Reset()
+        if self.extendedCostItems then
+            for _, costItem in ipairs(self.extendedCostItems) do
+                ResetTableContents(costItem)
+            end
+        end
+        ResetTableContents(self)
+        self.qualityColor = nil
+    end
+
+    -- If dirty it means the index is not defined or the item has pending data.
+    -- Performing a refresh call will force an update of the internal state.
+    ---@param index number
+    function MerchantItem:IsDirty(index)
+        if self.index ~= index then
+            self.index = index
+            return true
+        end
+        return self:IsPending()
+    end
+
+    -- If clean it means that the item has a valid index and has all its data loaded.
+    function MerchantItem:IsClean()
+        return self.index ~= 0 and not self:IsPending()
     end
 
     ---@return boolean isPending
@@ -450,7 +490,7 @@ local UpdateMerchantItemButton do
         return true
     end
 
-    ---@param parent MerchantDataProvider
+    ---@param parent MerchantScanner
     ---@param index number
     ---@return MerchantItem itemData
     function CreateMerchantItem(parent, index)
@@ -518,8 +558,8 @@ local UpdateMerchantItemButton do
 
 end
 
----@class MerchantDataProvider
-local MerchantDataProvider do
+---@class MerchantScanner
+local MerchantScanner do
 
     ---@alias CallbackRegistryCallbackFunction fun(owner: number, ...: any)
     ---@alias DataProviderItemData MerchantItem
@@ -533,6 +573,7 @@ local MerchantDataProvider do
     ---@field public Unregister fun()
 
     ---@class CallbackRegistry
+    ---@field public OnLoad fun(self: CallbackRegistry)
     ---@field public SetUndefinedEventsAllowed fun(self: CallbackRegistry, allowed: boolean)
     ---@field public HasRegistrantsForEvent fun(self: CallbackRegistry, event: string|number): boolean
     ---@field public SecureInsertEvent fun(self: CallbackRegistry, event: string|number)
@@ -570,23 +611,96 @@ local MerchantDataProvider do
     ---@field public ForEach fun(self: DataProvider, func: DataProviderForEach)
     ---@field public Flush fun(self: DataProvider)
 
-    ---@alias MerchantDataProviderEvent DataProviderEvent|"OnMerchantShow"|"OnMerchantHide"|"OnMerchantUpdate"|"OnMerchantReady"
+    ---@alias MerchantScannerEvent "OnShow"|"OnHide"|"OnUpdate"|"OnReady"
 
-    ---@class MerchantDataProvider : DataProvider
-    ---@field public Event table<MerchantDataProviderEvent, number>
-    ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: MerchantDataProviderEvent[])
+    ---@class MerchantScanner
+    ---@field public Event table<MerchantScannerEvent, number>
+    ---@field public collection DataProviderItemData[]
+    ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: MerchantScannerEvent[])
 
-    MerchantDataProvider = CreateDataProvider() ---@type MerchantDataProvider
+    ---@class MerchantScanner : Frame, CallbackRegistry
+    MerchantScanner = CreateFrame("Frame") ---@diagnostic disable-line: cast-local-type
 
-    MerchantDataProvider:GenerateCallbackEvents({
-        "OnMerchantShow",
-        "OnMerchantHide",
-        "OnMerchantUpdate",
-        "OnMerchantReady",
+    Mixin(MerchantScanner, CallbackRegistryMixin)
+    CallbackRegistryMixin.OnLoad(MerchantScanner)
+
+    MerchantScanner:GenerateCallbackEvents({
+        "OnShow",
+        "OnHide",
+        "OnUpdate",
+        "OnReady",
     })
 
+    MerchantScanner.collection = {}
+
+    ---@alias ObjectPoolObject any
+    ---@alias ObjectPoolCreate fun(pool: ObjectPool): ObjectPoolObject
+    ---@alias ObjectPoolReset fun(pool: ObjectPool, self: ObjectPoolObject)
+    ---@alias ObjectPoolFunction fun(creationFunc?: ObjectPoolCreate, resetterFunc?: ObjectPoolReset): ObjectPoolObject
+
+    ---@class ObjectPool
+    ---@field public OnLoad fun(self: ObjectPool, creationFunc?: ObjectPoolCreate, resetterFunc?: ObjectPoolReset)
+    ---@field public Acquire fun(self: ObjectPool): ObjectPoolObject, boolean
+    ---@field public Release fun(self: ObjectPool, object: ObjectPoolObject): boolean
+    ---@field public ReleaseAll fun(self: ObjectPool)
+    ---@field public SetResetDisallowedIfNew fun(self: ObjectPool, disallowed: boolean)
+    ---@field public EnumerateActive fun(self: ObjectPool): fun(): ObjectPoolObject
+    ---@field public GetNextActive fun(self: ObjectPool, current: ObjectPoolObject): fun(): ObjectPoolObject
+    ---@field public GetNextInactive fun(self: ObjectPool, current: ObjectPoolObject): fun(): ObjectPoolObject
+    ---@field public IsActive fun(self: ObjectPool, object: ObjectPoolObject): boolean
+    ---@field public GetNumActive fun(self: ObjectPool): number
+    ---@field public EnumerateInactive fun(self: ObjectPool): fun(): ObjectPoolObject
+
+    ---@alias FramePoolObject CompactVendorFrameMerchantButtonTemplate
+    ---@alias FramePoolCreate fun(pool: FramePool): FramePoolObject
+    ---@alias FramePoolReset fun(pool: FramePool, self: FramePoolObject)
+    ---@alias FramePoolFunction fun(frameType: FrameType, parent?: string|Region, frameTemplate?: string, resetterFunc?: FramePoolReset, forbidden?: boolean, frameInitFunc?: FramePoolCreate): FramePoolObject
+
+    ---@class FramePool : ObjectPool
+    ---@field public Acquire fun(self: FramePool): FramePoolObject, boolean
+    ---@field public Release fun(self: FramePool, object: FramePoolObject): boolean
+    ---@field public EnumerateActive fun(self: FramePool): fun(): FramePoolObject
+    ---@field public GetNextActive fun(self: FramePool, current: FramePoolObject): fun(): FramePoolObject
+    ---@field public GetNextInactive fun(self: FramePool, current: FramePoolObject): fun(): FramePoolObject
+    ---@field public IsActive fun(self: FramePool, object: FramePoolObject): boolean
+    ---@field public EnumerateInactive fun(self: FramePool): fun(): FramePoolObject
+    ---@field public GetTemplate fun(self: FramePool): string?
+
+    ---@class MerchantItemFramePool : FramePool
+
+    ---@alias MerchantItemPoolObject MerchantItem
+    ---@alias MerchantItemPoolCreate fun(pool: FramePool): MerchantItemPoolObject
+    ---@alias MerchantItemPoolReset fun(pool: FramePool, self: MerchantItemPoolObject)
+    ---@alias MerchantItemPoolFunction fun(frameType: FrameType, parent?: string|Region, frameTemplate?: string, resetterFunc?: MerchantItemPoolReset, forbidden?: boolean, frameInitFunc?: MerchantItemPoolCreate): MerchantItemPoolObject
+
+    ---@class MerchantItemPool : ObjectPool
+    ---@field public Acquire fun(self: MerchantItemPool): MerchantItemPoolObject, boolean
+    ---@field public Release fun(self: MerchantItemPool, object: MerchantItemPoolObject): boolean
+    ---@field public EnumerateActive fun(self: MerchantItemPool): fun(): MerchantItemPoolObject
+    ---@field public GetNextActive fun(self: MerchantItemPool, current: MerchantItemPoolObject): fun(): MerchantItemPoolObject
+    ---@field public GetNextInactive fun(self: MerchantItemPool, current: MerchantItemPoolObject): fun(): MerchantItemPoolObject
+    ---@field public IsActive fun(self: MerchantItemPool, object: MerchantItemPoolObject): boolean
+    ---@field public EnumerateInactive fun(self: MerchantItemPool): fun(): MerchantItemPoolObject
+
+    ---@type MerchantItemPool
+    MerchantScanner.itemPool = CreateObjectPool(
+        ---@param pool MerchantItemPool
+        function(pool)
+            local index = pool:GetNumActive() + 1
+            return CreateMerchantItem(MerchantScanner, index)
+        end,
+        ---@param pool MerchantItemPool
+        ---@param self MerchantItemPoolObject
+        function(pool, self)
+            self:Reset()
+        end
+    )
+
+    ---@type MerchantItemFramePool
+    MerchantScanner.buttonPool = CreateFramePool("Button", nil, "CompactVendorFrameMerchantButtonTemplate") ---@diagnostic disable-line: assign-type-mismatch
+
     ---@return boolean merchantExists, boolean sameMerchant
-    function MerchantDataProvider:UpdateMerchantInfo()
+    function MerchantScanner:UpdateMerchantInfo()
         local guid = self.guid
         self.guid = UnitGUID("npc")
         self.name = UnitName("npc")
@@ -594,103 +708,93 @@ local MerchantDataProvider do
         local sameMerchant = self.guid == guid
         if merchantExists and not sameMerchant then
             self.isReady = false
-            self:TriggerEvent(self.Event.OnMerchantShow)
+            self:TriggerEvent(self.Event.OnShow)
         elseif not merchantExists then
-            self:TriggerEvent(self.Event.OnMerchantHide)
+            self:TriggerEvent(self.Event.OnHide)
         end
         return merchantExists, sameMerchant
     end
 
     ---@return string guid, string name
-    function MerchantDataProvider:GetMerchantInfo()
+    function MerchantScanner:GetMerchantInfo()
         return self.guid, self.name
     end
 
-    ---@param forceFullUpdate? boolean
-    function MerchantDataProvider:UpdateMerchant(forceFullUpdate)
+    ---@param isFullUpdate? boolean
+    function MerchantScanner:UpdateMerchant(isFullUpdate)
         local merchantExists, sameMerchant = self:UpdateMerchantInfo()
-        if sameMerchant and forceFullUpdate ~= true then
+        if not merchantExists then
+            self:Reset()
             return
         end
-        if not merchantExists then
-            self:Flush()
+        if sameMerchant and isFullUpdate ~= true then
             return
         end
         local numMerchantItems = GetMerchantNumItems()
-        if numMerchantItems == self:GetSize() then
-            self:UpdateMerchantPendingItems()
-            return
-        end
-        self:Flush()
-        local collection = {} ---@type DataProviderItemData[]
-        for index = 1, numMerchantItems do
-            local itemData = CreateMerchantItem(self, index)
-            collection[index] = itemData
-        end
-        self:InsertTable(collection)
-        self:TriggerEvent(self.Event.OnMerchantUpdate, self.isReady)
-    end
-
-    function MerchantDataProvider:UpdateMerchantPendingItems()
-        local items = self:GetMerchantItems(function(itemData)
-            return itemData:IsPending()
-        end)
+        local collection = self.collection
         local pending = 0
-        for _, itemData in ipairs(items) do
-            pending = pending + 1
-            itemData:Refresh()
-            if not itemData:IsPending() then
-                pending = pending - 1
+        for index = 1, numMerchantItems do
+            local itemData = collection[index]
+            if not itemData then
+                itemData = MerchantScanner.itemPool:Acquire()
+            end
+            if itemData:IsDirty(index) then
+                pending = pending + 1
+                itemData:Refresh()
+                if not itemData:IsPending() then
+                    pending = pending - 1
+                end
             end
         end
+        self:Reset(numMerchantItems + 1)
         if pending == 0 and not self.isReady then
             self.isReady = true
-            self:TriggerEvent(self.Event.OnMerchantReady)
-            self:TriggerEvent(self.Event.OnMerchantUpdate, self.isReady)
+            self:TriggerEvent(self.Event.OnReady, self.isReady)
         end
+        self:TriggerEvent(self.Event.OnUpdate, self.isReady)
     end
 
     ---@param itemID number
     ---@param checkCostItems? boolean
-    function MerchantDataProvider:UpdateMerchantItemByID(itemID, checkCostItems)
-        local items = self:GetMerchantItems(function(itemData)
+    function MerchantScanner:UpdateMerchantItemByID(itemID, checkCostItems)
+        local refreshed = 0
+        local pending = 0
+        for _, itemData in ipairs(self.collection) do
+            local refresh
             if itemData.merchantItemID == itemID then
-                return true
+                refresh = true
             elseif checkCostItems then
                 for i = 1, itemData.extendedCostCount do
                     local costItem = itemData.extendedCostItems[i]
                     if costItem.itemID == itemID then
-                        return true
+                        refresh = true
+                        break
                     end
                 end
             end
-            return false
-        end)
-        for _, itemData in ipairs(items) do
-            itemData:Refresh()
-        end
-        self:TriggerEvent(self.Event.OnMerchantUpdate, self.isReady)
-    end
-
-    function MerchantDataProvider:UpdateMerchantStockItems()
-        local items = self:GetMerchantItems()
-        for _, itemData in ipairs(items) do
-            if itemData.numAvailable ~= -1 then
+            if refresh then
+                refreshed = refreshed + 1
+                pending = pending + 1
                 itemData:Refresh()
+                if not itemData:IsPending() then
+                    pending = pending - 1
+                end
             end
         end
+        if refreshed == 0 then
+            return
+        end
+        if pending == 0 and self.isReady then
+            self:TriggerEvent(self.Event.OnUpdate, self.isReady)
+        end
     end
 
-    ---@param predicate? DataProviderPredicate
     ---@return DataProviderItemData[] merchantItems
-    function MerchantDataProvider:GetMerchantItems(predicate)
-        if type(predicate) ~= "function" then
-            predicate = nil
-        end
-        local collection = {} ---@type DataProviderItemData
+    function MerchantScanner:GetMerchantItems()
+        local collection = {} ---@type DataProviderItemData[]
         local index = 0
         for _, itemData in ipairs(self.collection) do
-            if not predicate or predicate(itemData) then
+            if itemData:IsClean() then
                 index = index + 1
                 collection[index] = itemData
             end
@@ -698,40 +802,32 @@ local MerchantDataProvider do
         return collection
     end
 
-    ---@param index number
-    ---@return DataProviderItemData? itemData
-    function MerchantDataProvider:GetMerchantItem(index)
-        return self.collection[index]
-    end
-
-    ---@return boolean hasMerchantItems
-    function MerchantDataProvider:HasMerchantItems()
-        return not not self.collection[1]
-    end
-
-    function MerchantDataProvider:HasMerchantPendingItems()
-        if not self.isReady then
-            return 1
+    ---@param startIndex? number
+    ---@param endIndex? number
+    function MerchantScanner:Reset(startIndex, endIndex)
+        if not startIndex then
+            startIndex = 1
         end
-        for _, itemData in ipairs(self.collection) do
-            if itemData:IsPending() then
-                return true
-            end
+        local collection = self.collection
+        local count = #collection
+        if not endIndex or endIndex > count then
+            endIndex = count
         end
-        return false
+        for index = startIndex, endIndex do
+            local itemData = collection[index]
+            itemData:Reset()
+        end
     end
 
     local function UpdateMerchant()
-        MerchantDataProvider:UpdateMerchant(true)
+        MerchantScanner:UpdateMerchant(true)
     end
 
     hooksecurefunc("SetMerchantFilter", UpdateMerchant)
     hooksecurefunc("ResetSetMerchantFilter", UpdateMerchant)
 
-    local Service = CreateFrame("Frame")
-
     ---@type WowEvent[]
-    Service.MerchantEvents = {
+    MerchantScanner.Events = {
         "MERCHANT_UPDATE",
         "MERCHANT_FILTER_ITEM_UPDATE",
         "HEIRLOOMS_UPDATED",
@@ -741,178 +837,68 @@ local MerchantDataProvider do
 
     ---@param event WowEvent
     ---@param ... any
-    function Service:OnEvent(event, ...)
+    function MerchantScanner:OnEvent(event, ...)
         if event == "MERCHANT_SHOW" then
-            FrameUtil.RegisterFrameForEvents(self, self.MerchantEvents)
-            MerchantDataProvider:UpdateMerchant(true)
+            FrameUtil.RegisterFrameForEvents(self, self.Events)
+            MerchantScanner:UpdateMerchant(true)
         elseif event == "MERCHANT_CLOSED" then
-            FrameUtil.UnregisterFrameForEvents(self, self.MerchantEvents)
-            MerchantDataProvider:UpdateMerchant()
+            FrameUtil.UnregisterFrameForEvents(self, self.Events)
+            MerchantScanner:UpdateMerchant()
         elseif event == "UNIT_INVENTORY_CHANGED" then
             local unit = ...
             if unit == "player" then
-                MerchantDataProvider:UpdateMerchantStockItems()
+                MerchantScanner:UpdateMerchant()
             end
         elseif event == "MERCHANT_UPDATE" then
-            MerchantDataProvider:UpdateMerchantPendingItems()
+            MerchantScanner:UpdateMerchant()
         elseif event == "MERCHANT_FILTER_ITEM_UPDATE" then
             local itemID = ...
-            MerchantDataProvider:UpdateMerchantItemByID(itemID)
+            MerchantScanner:UpdateMerchantItemByID(itemID)
         elseif event == "HEIRLOOMS_UPDATED" then
             local itemID, updateReason = ...
             if itemID and updateReason == "NEW" then
-                MerchantDataProvider:UpdateMerchantItemByID(itemID)
+                MerchantScanner:UpdateMerchantItemByID(itemID)
             end
         elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
             local itemID, success = ...
             if success then
-                MerchantDataProvider:UpdateMerchantItemByID(itemID, true)
+                MerchantScanner:UpdateMerchantItemByID(itemID, true)
             end
         end
-        if MerchantDataProvider:HasMerchantPendingItems() then
-            Service:StartPending()
-        else
-            Service:StopPending()
-        end
     end
 
-    Service:SetScript("OnEvent", Service.OnEvent)
-    Service:RegisterEvent("MERCHANT_SHOW")
-    Service:RegisterEvent("MERCHANT_CLOSED")
-    Service:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
-
-    local PendingTicker
-
-    local function PendingTick()
-        if MerchantDataProvider:HasMerchantPendingItems() then
-            MerchantDataProvider:UpdateMerchantPendingItems()
-        else
-            Service:StopPending()
-        end
-    end
-
-    function Service:StartPending()
-        if PendingTicker then
-            return
-        end
-        PendingTicker = C_Timer.NewTicker(0.25, PendingTick)
-    end
-
-    function Service:StopPending()
-        if not PendingTicker then
-            return
-        end
-        PendingTicker:Cancel()
-        PendingTicker = nil
-    end
+    MerchantScanner:SetScript("OnEvent", MerchantScanner.OnEvent)
+    MerchantScanner:RegisterEvent("MERCHANT_SHOW")
+    MerchantScanner:RegisterEvent("MERCHANT_CLOSED")
+    MerchantScanner:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
 
 end
 
----@class MerchantItemProvider
-local MerchantItemProvider do
+---@class MerchantDataProvider
+local MerchantDataProvider do
 
-    ---@alias MerchantItemProviderEvent DataProviderEvent|"OnMerchantItemsShow"|"OnMerchantItemsUpdate"|"OnMerchantItemsReady"|"OnMerchantItemsHide"
+    ---@alias MerchantItemProviderEvent DataProviderEvent|MerchantScannerEvent
 
-    ---@class MerchantItemProvider : DataProvider
+    ---@class MerchantDataProvider : DataProvider
     ---@field public Event table<MerchantItemProviderEvent, number>
     ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: MerchantItemProviderEvent[])
 
-    MerchantItemProvider = CreateDataProvider() ---@type MerchantItemProvider
+    MerchantDataProvider = CreateDataProvider() ---@type MerchantDataProvider
 
-    MerchantItemProvider:GenerateCallbackEvents({
-        "OnMerchantItemsShow",
-        "OnMerchantItemsUpdate",
-        "OnMerchantItemsReady",
-        "OnMerchantItemsHide",
+    MerchantDataProvider:GenerateCallbackEvents({
+        "OnShow",
+        "OnHide",
+        "OnUpdate",
+        "OnReady",
     })
 
-    ---@alias MerchantItemFilter fun(itemData: MerchantItem): boolean?
-
-    -- ---@type MerchantItemFilter[]
-    -- MerchantItemProvider.Filters = {}
-
-    -- ---@type table<MerchantItem, boolean?>
-    -- MerchantItemProvider.Filtered = {}
-
-    -- function MerchantItemProvider:InternalFlush()
-    --     self:Flush()
-    --     table.wipe(self.Filtered)
-    -- end
-
-    -- ---@param items MerchantItem[]
-    -- function MerchantItemProvider:InternalInsert(items)
-    --     local collection = {}
-    --     local index = 0
-    --     for _, itemData in ipairs(items) do
-    --         local filtered
-    --         for _, filter in ipairs(self.Filters) do
-    --             if filter(itemData) then
-    --                 filtered = true
-    --                 break
-    --             else
-    --                 filtered = false
-    --             end
-    --         end
-    --         if not filtered then
-    --             index = index + 1
-    --             collection[index] = itemData
-    --         end
-    --     end
-    --     self:InsertTable(collection)
-    -- end
-
-    -- function MerchantItemProvider:Enumerate()
-    --     local index = 0
-    --     local itemData
-    --     return function()
-    --         repeat
-    --             index = index + 1
-    --             itemData = self.collection[index]
-    --             if not itemData then
-    --                 return
-    --             end
-    --             if not self.Filtered[itemData] then
-    --                 break
-    --             end
-    --         until not itemData
-    --         return itemData
-    --     end
-    -- end
-
     local function OnShow()
-        MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsShow)
+        MerchantDataProvider:TriggerEvent(MerchantDataProvider.Event.OnShow)
     end
 
-    ---@param isFullUpdate boolean
-    local function OnReady(isFullUpdate)
-        local items = MerchantDataProvider:GetMerchantItems()
-        if isFullUpdate == true then
-            local hasSortComparator = MerchantItemProvider:HasSortComparator()
-            local hasUpdated = false
-            for oldIndex, oldItemData in ipairs(MerchantItemProvider.collection) do
-                local itemData ---@type MerchantItem?
-                for _, newItemData in ipairs(items) do
-                    if oldItemData:GetIndex() == newItemData:GetIndex() then
-                        itemData = newItemData
-                        break
-                    end
-                end
-                if itemData then
-                    hasUpdated = true
-                    MerchantItemProvider.collection[oldIndex] = itemData
-                    -- MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnInsert, oldIndex, itemData, hasSortComparator)
-                end
-            end
-            if hasUpdated then
-                MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnSizeChanged, hasSortComparator)
-                MerchantItemProvider:Sort()
-            end
-            MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsUpdate)
-            return
-        end
-        MerchantItemProvider:Flush()
-        MerchantItemProvider:InsertTable(items)
-        MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsReady)
+    local function OnHide()
+        MerchantDataProvider:Flush()
+        MerchantDataProvider:TriggerEvent(MerchantDataProvider.Event.OnHide)
     end
 
     ---@param isReady boolean
@@ -920,18 +906,21 @@ local MerchantItemProvider do
         if isReady ~= true then
             return
         end
-        OnReady(true)
+        MerchantDataProvider:Flush()
+        MerchantDataProvider:InsertTable(MerchantScanner:GetMerchantItems())
+        MerchantDataProvider:TriggerEvent(MerchantDataProvider.Event.OnUpdate, isReady)
     end
 
-    local function OnHide()
-        MerchantItemProvider:Flush()
-        MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsHide)
+    local function OnReady()
+        MerchantDataProvider:Flush()
+        MerchantDataProvider:InsertTable(MerchantScanner:GetMerchantItems())
+        MerchantDataProvider:TriggerEvent(MerchantDataProvider.Event.OnUpdate, true)
     end
 
-    MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantShow, OnShow)
-    MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantReady, OnReady)
-    MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantUpdate, OnUpdate)
-    MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantHide, OnHide)
+    MerchantScanner:RegisterCallback(MerchantScanner.Event.OnShow, OnShow)
+    MerchantScanner:RegisterCallback(MerchantScanner.Event.OnHide, OnHide)
+    MerchantScanner:RegisterCallback(MerchantScanner.Event.OnUpdate, OnUpdate)
+    MerchantScanner:RegisterCallback(MerchantScanner.Event.OnReady, OnReady)
 
 end
 
@@ -1094,7 +1083,7 @@ local Frame do
             ---@alias ScrollBoxElementData MerchantItem
             ---@alias ScrollBoxView ViewPolyfill
             ---@alias ScrollBoxTarget Frame
-            ---@alias ScrollBoxDataProvider MerchantItemProvider
+            ---@alias ScrollBoxDataProvider MerchantDataProvider
             ---@alias ScrollBoxFrameData any
             ---@alias ScrollBoxFrame Frame
             ---@alias ScrollBoxBaseEvents "OnAllowScrollChanged"|"OnSizeChanged"|"OnScroll"|"OnLayout"
@@ -1254,15 +1243,15 @@ local Frame do
                 view:SetPadding(2, 2, 2, 2, 0)
                 ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view)
 
-                self.ScrollBox:SetDataProvider(MerchantItemProvider)
+                self.ScrollBox:SetDataProvider(MerchantDataProvider)
 
                 local function Refresh()
                     self.ScrollBox:Update()
                 end
 
-                MerchantItemProvider:RegisterCallback(MerchantItemProvider.Event.OnMerchantItemsShow, Refresh)
-                MerchantItemProvider:RegisterCallback(MerchantItemProvider.Event.OnMerchantItemsReady, Refresh)
-                MerchantItemProvider:RegisterCallback(MerchantItemProvider.Event.OnMerchantItemsUpdate, Refresh)
+                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnShow, Refresh)
+                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnUpdate, Refresh)
+                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnReady, Refresh)
 
             end
 

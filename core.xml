@@ -3,7 +3,11 @@
 
     <Script file="core.lua" />
 
-    <Font name="CompactVendorFrameFont" inherits="SystemFont_Shadow_Med2" virtual="true">
+    <Font name="CompactVendorFrameFont1" inherits="SystemFont_Shadow_Med1" virtual="true">
+        <Color r="1.0" g="1.0" b="1.0" />
+    </Font>
+
+    <Font name="CompactVendorFrameFont2" inherits="SystemFont_Shadow_Med2" virtual="true">
         <Color r="1.0" g="1.0" b="1.0" />
     </Font>
 
@@ -16,7 +20,7 @@
                     <TexCoords left="0" right="0.671875" top="0" bottom="0.75" />
                 </Texture>
                 <Texture parentKey="MultiItemSplitBackground" atlas="UI-MoneyFrame-Large" useAtlasSize="true" hidden="true" />
-                <FontString parentKey="StackSplitText" inherits="CompactVendorFrameFont" justifyH="RIGHT">
+                <FontString parentKey="StackSplitText" inherits="CompactVendorFrameFont1" justifyH="RIGHT">
                     <Anchors>
                         <Anchor point="RIGHT" x="-50" y="18" />
                     </Anchors>
@@ -101,7 +105,7 @@
                 </Texture>
             </Layer>
             <Layer level="OVERLAY">
-                <FontString parentKey="Name" inherits="CompactVendorFrameFont" justifyH="LEFT" wordwrap="false">
+                <FontString parentKey="Name" inherits="CompactVendorFrameFont1" justifyH="LEFT" wordwrap="false">
                     <Anchors>
                         <Anchor point="TOPLEFT" />
                         <Anchor point="BOTTOMRIGHT" />
@@ -123,7 +127,7 @@
 		<Size x="24" y="24" />
 		<Layers>
 			<Layer level="OVERLAY">
-				<FontString parentKey="Name" inherits="CompactVendorFrameFont" justifyH="RIGHT" wordwrap="false">
+				<FontString parentKey="Name" inherits="CompactVendorFrameFont1" justifyH="RIGHT" wordwrap="false">
 					<Anchors>
 						<Anchor point="RIGHT" relativeKey="$parent" relativePoint="RIGHT" x="-1" y="0" />
 					</Anchors>
@@ -156,7 +160,7 @@
 						</MaskTexture>
 					</Layer>
 					<Layer level="OVERLAY">
-						<FontString parentKey="Count" inherits="CompactVendorFrameFont" justifyH="RIGHT" justifyV="BOTTOM" wordwrap="false">
+						<FontString parentKey="Count" inherits="CompactVendorFrameFont1" justifyH="RIGHT" justifyV="BOTTOM" wordwrap="false">
 							<Anchors>
 								<Anchor point="BOTTOMRIGHT" />
 							</Anchors>
@@ -208,7 +212,7 @@
                         <MaskedTexture childKey="Icon" />
                     </MaskedTextures>
                 </MaskTexture>
-                <FontString parentKey="Name" inherits="CompactVendorFrameFont" justifyH="LEFT" wordwrap="false">
+                <FontString parentKey="Name" inherits="CompactVendorFrameFont1" justifyH="LEFT" wordwrap="false">
                     <Anchors>
                         <Anchor point="TOPLEFT" relativeKey="$parent.Icon" relativePoint="TOPRIGHT" x="4" y="0" />
                         <Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT" x="-4" y="0" />
