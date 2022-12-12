@@ -289,7 +289,8 @@ local UpdateMerchantItemButton do
     ---@param tbl table
     local function ResetTableContents(tbl)
         for k, v in pairs(tbl) do
-            if type(v) == "number" then
+            if type(k) == "userdata" or type(v) == "function" then
+            elseif type(v) == "number" then
                 tbl[k] = 0
             elseif type(v) ~= "table" then
                 tbl[k] = nil
@@ -343,7 +344,7 @@ local UpdateMerchantItemButton do
         if self.currencyID then
             self.name, self.texture, self.numAvailable, self.quality = GetCurrencyContainerInfo(self.currencyID, self.numAvailable, self.name, self.texture, nil)
         end
-        self.canAfford = CanAffordMerchantItem(index) ---@diagnostic disable-line: assign-type-mismatch
+        self.canAfford = CanAffordMerchantItem(index) ~= false
         if self.extendedCost and self.price <= 0 then
             self.costType = MerchantItemCostType.Currency
         elseif self.extendedCost and self.price > 0 then
@@ -455,7 +456,7 @@ local UpdateMerchantItemButton do
     end
 
     function MerchantItem:CanSpecifyQuantity()
-        return true -- TOOD: figure out what items we can actually buy in bulk, and what items we can't and should just hide the quantity button
+        return self.canAfford
     end
 
     function MerchantItem:CanSkipConfirmation()
@@ -528,7 +529,7 @@ local UpdateMerchantItemButton do
         local isUsable = merchantItem.isUsable
         local canAfford = merchantItem.canAfford
         local canLearn = false -- TODO
-        if isPurchasable == false or isUsable == false or canAfford == false then
+        if not isPurchasable or not isUsable or not canAfford then
             backgroundColor = BackgroundColorPreset.Red
         end
         if canLearn then
@@ -710,6 +711,7 @@ local MerchantScanner do
             self.isReady = false
             self:TriggerEvent(self.Event.OnShow)
         elseif not merchantExists then
+            self.isReady = false
             self:TriggerEvent(self.Event.OnHide)
         end
         return merchantExists, sameMerchant
@@ -721,24 +723,24 @@ local MerchantScanner do
     end
 
     ---@param isFullUpdate? boolean
-    function MerchantScanner:UpdateMerchant(isFullUpdate)
-        local merchantExists, sameMerchant = self:UpdateMerchantInfo()
+    ---@param predicate? fun(itemData: MerchantItem): boolean?
+    function MerchantScanner:UpdateMerchant(isFullUpdate, predicate)
+        local merchantExists = self:UpdateMerchantInfo()
         if not merchantExists then
             self:Reset()
+            self.itemPool:ReleaseAll()
             return
         end
-        if sameMerchant and isFullUpdate ~= true then
-            return
+        if isFullUpdate == true then
+            self.itemPool:ReleaseAll()
         end
         local numMerchantItems = GetMerchantNumItems()
         local collection = self.collection
         local pending = 0
         for index = 1, numMerchantItems do
-            local itemData = collection[index]
-            if not itemData then
-                itemData = MerchantScanner.itemPool:Acquire()
-            end
-            if itemData:IsDirty(index) then
+            local itemData = self.itemPool:Acquire()
+            collection[index] = itemData
+            if itemData:IsDirty(index) or isFullUpdate == true or (predicate and predicate(itemData)) then
                 pending = pending + 1
                 itemData:Refresh()
                 if not itemData:IsPending() then
@@ -757,36 +759,19 @@ local MerchantScanner do
     ---@param itemID number
     ---@param checkCostItems? boolean
     function MerchantScanner:UpdateMerchantItemByID(itemID, checkCostItems)
-        local refreshed = 0
-        local pending = 0
-        for _, itemData in ipairs(self.collection) do
-            local refresh
+        self:UpdateMerchant(false, function(itemData)
             if itemData.merchantItemID == itemID then
-                refresh = true
+                return true
             elseif checkCostItems then
                 for i = 1, itemData.extendedCostCount do
                     local costItem = itemData.extendedCostItems[i]
                     if costItem.itemID == itemID then
-                        refresh = true
-                        break
+                        return true
                     end
                 end
             end
-            if refresh then
-                refreshed = refreshed + 1
-                pending = pending + 1
-                itemData:Refresh()
-                if not itemData:IsPending() then
-                    pending = pending - 1
-                end
-            end
-        end
-        if refreshed == 0 then
-            return
-        end
-        if pending == 0 and self.isReady then
-            self:TriggerEvent(self.Event.OnUpdate, self.isReady)
-        end
+            return false
+        end)
     end
 
     ---@return DataProviderItemData[] merchantItems
@@ -829,10 +814,10 @@ local MerchantScanner do
     ---@type WowEvent[]
     MerchantScanner.Events = {
         "MERCHANT_UPDATE",
-        "MERCHANT_FILTER_ITEM_UPDATE",
-        "HEIRLOOMS_UPDATED",
-        "GET_ITEM_INFO_RECEIVED",
-        "ITEM_DATA_LOAD_RESULT",
+        -- "MERCHANT_FILTER_ITEM_UPDATE",
+        -- "HEIRLOOMS_UPDATED",
+        -- "GET_ITEM_INFO_RECEIVED",
+        -- "ITEM_DATA_LOAD_RESULT",
     }
 
     ---@param event WowEvent
@@ -877,7 +862,7 @@ end
 ---@class MerchantDataProvider
 local MerchantDataProvider do
 
-    ---@alias MerchantItemProviderEvent DataProviderEvent|MerchantScannerEvent
+    ---@alias MerchantItemProviderEvent DataProviderEvent|MerchantScannerEvent|"OnPreUpdate"|"OnPostUpdate"
 
     ---@class MerchantDataProvider : DataProvider
     ---@field public Event table<MerchantItemProviderEvent, number>
@@ -888,9 +873,21 @@ local MerchantDataProvider do
     MerchantDataProvider:GenerateCallbackEvents({
         "OnShow",
         "OnHide",
+        "OnPreUpdate",
         "OnUpdate",
+        "OnPostUpdate",
         "OnReady",
     })
+
+    ---@param isReady boolean
+    function MerchantDataProvider:Refresh(isReady)
+        self:TriggerEvent(self.Event.OnPreUpdate, isReady)
+        self:Flush()
+        local items = MerchantScanner:GetMerchantItems()
+        self:InsertTable(items)
+        self:TriggerEvent(self.Event.OnUpdate, isReady)
+        self:TriggerEvent(self.Event.OnPostUpdate, isReady)
+    end
 
     local function OnShow()
         MerchantDataProvider:TriggerEvent(MerchantDataProvider.Event.OnShow)
@@ -906,15 +903,11 @@ local MerchantDataProvider do
         if isReady ~= true then
             return
         end
-        MerchantDataProvider:Flush()
-        MerchantDataProvider:InsertTable(MerchantScanner:GetMerchantItems())
-        MerchantDataProvider:TriggerEvent(MerchantDataProvider.Event.OnUpdate, isReady)
+        MerchantDataProvider:Refresh(isReady)
     end
 
     local function OnReady()
-        MerchantDataProvider:Flush()
-        MerchantDataProvider:InsertTable(MerchantScanner:GetMerchantItems())
-        MerchantDataProvider:TriggerEvent(MerchantDataProvider.Event.OnUpdate, true)
+        MerchantDataProvider:Refresh(true)
     end
 
     MerchantScanner:RegisterCallback(MerchantScanner.Event.OnShow, OnShow)
@@ -1087,7 +1080,7 @@ local Frame do
             ---@alias ScrollBoxFrameData any
             ---@alias ScrollBoxFrame Frame
             ---@alias ScrollBoxBaseEvents "OnAllowScrollChanged"|"OnSizeChanged"|"OnScroll"|"OnLayout"
-            ---@alias ScrollBoxListEvents "OnAcquiredFrame"|"OnInitializedFrame"|"OnReleasedFrame"|"OnDataRangeChanged"|"OnUpdate"
+            ---@alias ScrollBoxListEvents ScrollBoxBaseEvents|"OnAcquiredFrame"|"OnInitializedFrame"|"OnReleasedFrame"|"OnDataRangeChanged"|"OnUpdate"
             ---@alias ScrollBoxForEachFunction fun(elementData: ScrollBoxElementData)
             ---@alias ScrollBoxPredicateFunction fun(elementData: ScrollBoxElementData): boolean?
 
@@ -1245,13 +1238,25 @@ local Frame do
 
                 self.ScrollBox:SetDataProvider(MerchantDataProvider)
 
-                local function Refresh()
-                    self.ScrollBox:Update()
+                local scrollPercentage
+
+                local function OnPreUpdate()
+                    if scrollPercentage then
+                        return
+                    end
+                    scrollPercentage = self.ScrollBox:CalculateScrollPercentage()
                 end
 
-                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnShow, Refresh)
-                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnUpdate, Refresh)
-                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnReady, Refresh)
+                local function OnPostUpdate()
+                    if not scrollPercentage then
+                        return
+                    end
+                    self.ScrollBox:SetScrollPercentage(scrollPercentage)
+                    scrollPercentage = nil
+                end
+
+                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPreUpdate, OnPreUpdate)
+                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, OnPostUpdate)
 
             end
 
@@ -1917,13 +1922,10 @@ local CompactVendorFrameMerchantButtonTemplate do
         end
         if IsModifiedClick("DRESSUP") then
             ShowInspectCursor()
+        elseif not merchantItem.canAfford then
+            SetCursor("BUY_ERROR_CURSOR")
         else
-            local index = merchantItem:GetIndex()
-            if CanAffordMerchantItem(index) == false then
-                SetCursor("BUY_ERROR_CURSOR")
-            else
-                SetCursor("BUY_CURSOR")
-            end
+            SetCursor("BUY_CURSOR")
         end
     end
 
