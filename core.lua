@@ -886,14 +886,33 @@ local MerchantItemProvider do
     ---@param isFullUpdate boolean
     local function OnReady(isFullUpdate)
         local items = MerchantDataProvider:GetMerchantItems()
-        -- print(#items) -- TODO: during a full update maybe we just want to swap out the contents without actually flushing and inserting the provider like we currently do?
+        if isFullUpdate == true then
+            local hasSortComparator = MerchantItemProvider:HasSortComparator()
+            local hasUpdated = false
+            for oldIndex, oldItemData in ipairs(MerchantItemProvider.collection) do
+                local itemData ---@type MerchantItem?
+                for _, newItemData in ipairs(items) do
+                    if oldItemData:GetIndex() == newItemData:GetIndex() then
+                        itemData = newItemData
+                        break
+                    end
+                end
+                if itemData then
+                    hasUpdated = true
+                    MerchantItemProvider.collection[oldIndex] = itemData
+                    -- MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnInsert, oldIndex, itemData, hasSortComparator)
+                end
+            end
+            if hasUpdated then
+                MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnSizeChanged, hasSortComparator)
+                MerchantItemProvider:Sort()
+            end
+            MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsUpdate)
+            return
+        end
         MerchantItemProvider:Flush()
         MerchantItemProvider:InsertTable(items)
-        if isFullUpdate == true then
-            MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsUpdate)
-        else
-            MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsReady)
-        end
+        MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsReady)
     end
 
     ---@param isReady boolean
