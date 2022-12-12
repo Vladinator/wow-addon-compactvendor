@@ -341,6 +341,9 @@ local UpdateMerchantItemButton do
             costItem.itemLink,
             costItem.name = GetMerchantItemCostItem(index, i)
             if costItem.itemLink then
+                if not costItem.name then
+                    costItem.name = GetItemInfo(costItem.itemLink)
+                end
                 if not costItem.itemID then
                     costItem.itemID = GetItemIDFromLink(costItem.itemLink)
                 end
@@ -409,16 +412,6 @@ local UpdateMerchantItemButton do
 
     function MerchantItem:IsAvailabilityAvailableAndUsable()
         return self:IsAvailability(MerchantItemAvailabilityType.AvailableAndUsable)
-    end
-
-    ---@return boolean isFiltered
-    function MerchantItem:IsFiltered()
-        return not not self.isFiltered
-    end
-
-    ---@param isFiltered boolean
-    function MerchantItem:SetFiltered(isFiltered)
-        self.isFiltered = isFiltered
     end
 
     function MerchantItem:CanSpecifyQuantity()
@@ -534,7 +527,7 @@ local MerchantDataProvider do
     ---@alias DataProviderPredicate fun(itemData: DataProviderItemData): boolean?
     ---@alias DataProviderSortComparator fun(a: DataProviderItemData, b: DataProviderItemData): boolean
     ---@alias DataProviderForEach fun(itemData: DataProviderItemData)
-    ---@alias DataProviderEvent "OnSizeChanged"|"OnInsert"|"OnRemove"|"OnSort"|"OnMerchantShow"|"OnMerchantHide"|"OnMerchantReady"|"OnMerchantFilter"|"OnMerchantUpdate"|"OnMerchantUpdateFilters"
+    ---@alias DataProviderEvent "OnSizeChanged"|"OnInsert"|"OnRemove"|"OnSort"
 
     ---@class CallbackRegistryCallbackHandle
     ---@field public Unregister fun()
@@ -549,54 +542,48 @@ local MerchantDataProvider do
     ---@field public UnregisterCallback fun(self: CallbackRegistry, event: string|number, owner: string|number)
     ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: DataProviderEvent[])
 
-    ---@class MerchantDataProvider : CallbackRegistry
+    ---@class DataProvider : CallbackRegistry
     ---@field public Event table<DataProviderEvent, number>
     ---@field public collection DataProviderItemData[]
     ---@field public sortComparator? DataProviderSortComparator
-    ---@field public Init fun(self: MerchantDataProvider, tbl?: DataProviderItemData[])
-    ---@field public Enumerate fun(self: MerchantDataProvider, indexBegin?: number, indexEnd?: number): DataProviderEnumerator
-    ---@field public GetSize fun(self: MerchantDataProvider): number
-    ---@field public IsEmpty fun(self: MerchantDataProvider): boolean
-    ---@field public InsertInternal fun(self: MerchantDataProvider, itemData: DataProviderItemData, hasSortComparator: boolean)
-    ---@field public Insert fun(self: MerchantDataProvider, ...: DataProviderItemData)
-    ---@field public InsertTable fun(self: MerchantDataProvider, tbl: DataProviderItemData[])
-    ---@field public InsertTableRange fun(self: MerchantDataProvider, tbl: DataProviderItemData[], indexBegin: number, indexEnd: number)
-    ---@field public Remove fun(self: MerchantDataProvider, ...: DataProviderItemData): removedIndex: number
-    ---@field public RemoveByPredicate fun(self: MerchantDataProvider, predicate: DataProviderPredicate)
-    ---@field public RemoveIndex fun(self: MerchantDataProvider, index: number)
-    ---@field public RemoveIndexRange fun(self: MerchantDataProvider, indexBegin: number, indexEnd: number)
-    ---@field public SetSortComparator fun(self: MerchantDataProvider, sortComparator: DataProviderSortComparator, skipSort: boolean)
-    ---@field public HasSortComparator fun(self: MerchantDataProvider): boolean
-    ---@field public Sort fun(self: MerchantDataProvider)
-    ---@field public Find fun(self: MerchantDataProvider, index: number): itemData: DataProviderItemData?
-    ---@field public FindIndex fun(self: MerchantDataProvider, itemData: DataProviderItemData): index: number?, itemDataIter: DataProviderEnumerator?
-    ---@field public FindByPredicate fun(self: MerchantDataProvider, predicate: DataProviderPredicate): index: number?, itemData: DataProviderItemData?
-    ---@field public FindElementDataByPredicate fun(self: MerchantDataProvider, predicate: DataProviderPredicate): itemData: DataProviderItemData?
-    ---@field public FindIndexByPredicate fun(self: MerchantDataProvider, predicate: DataProviderPredicate): index: number?
-    ---@field public ContainsByPredicate fun(self: MerchantDataProvider, predicate: DataProviderPredicate): boolean
-    ---@field public ForEach fun(self: MerchantDataProvider, func: DataProviderForEach)
-    ---@field public Flush fun(self: MerchantDataProvider)
+    ---@field public Init fun(self: DataProvider, tbl?: DataProviderItemData[])
+    ---@field public Enumerate fun(self: DataProvider, indexBegin?: number, indexEnd?: number): DataProviderEnumerator
+    ---@field public GetSize fun(self: DataProvider): number
+    ---@field public IsEmpty fun(self: DataProvider): boolean
+    ---@field public InsertInternal fun(self: DataProvider, itemData: DataProviderItemData, hasSortComparator: boolean)
+    ---@field public Insert fun(self: DataProvider, ...: DataProviderItemData)
+    ---@field public InsertTable fun(self: DataProvider, tbl: DataProviderItemData[])
+    ---@field public InsertTableRange fun(self: DataProvider, tbl: DataProviderItemData[], indexBegin: number, indexEnd: number)
+    ---@field public Remove fun(self: DataProvider, ...: DataProviderItemData): removedIndex: number
+    ---@field public RemoveByPredicate fun(self: DataProvider, predicate: DataProviderPredicate)
+    ---@field public RemoveIndex fun(self: DataProvider, index: number)
+    ---@field public RemoveIndexRange fun(self: DataProvider, indexBegin: number, indexEnd: number)
+    ---@field public SetSortComparator fun(self: DataProvider, sortComparator: DataProviderSortComparator, skipSort: boolean)
+    ---@field public HasSortComparator fun(self: DataProvider): boolean
+    ---@field public Sort fun(self: DataProvider)
+    ---@field public Find fun(self: DataProvider, index: number): itemData: DataProviderItemData?
+    ---@field public FindIndex fun(self: DataProvider, itemData: DataProviderItemData): index: number?, itemDataIter: DataProviderEnumerator?
+    ---@field public FindByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): index: number?, itemData: DataProviderItemData?
+    ---@field public FindElementDataByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): itemData: DataProviderItemData?
+    ---@field public FindIndexByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): index: number?
+    ---@field public ContainsByPredicate fun(self: DataProvider, predicate: DataProviderPredicate): boolean
+    ---@field public ForEach fun(self: DataProvider, func: DataProviderForEach)
+    ---@field public Flush fun(self: DataProvider)
+
+    ---@alias MerchantDataProviderEvent DataProviderEvent|"OnMerchantShow"|"OnMerchantHide"|"OnMerchantUpdate"|"OnMerchantReady"
+
+    ---@class MerchantDataProvider : DataProvider
+    ---@field public Event table<MerchantDataProviderEvent, number>
+    ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: MerchantDataProviderEvent[])
 
     MerchantDataProvider = CreateDataProvider() ---@type MerchantDataProvider
 
     MerchantDataProvider:GenerateCallbackEvents({
         "OnMerchantShow",
         "OnMerchantHide",
-        "OnMerchantReady",
-        "OnMerchantFilter",
         "OnMerchantUpdate",
-        "OnMerchantUpdateFilters",
+        "OnMerchantReady",
     })
-
-    ---@type table<string, DataProviderPredicate>
-    MerchantDataProvider.FilterPreset = {
-        IsNotFiltered = function(itemData)
-            return not itemData:IsFiltered()
-        end,
-        IsPending = function(itemData)
-            return itemData:IsPending()
-        end,
-    }
 
     ---@return boolean merchantExists, boolean sameMerchant
     function MerchantDataProvider:UpdateMerchantInfo()
@@ -668,12 +655,12 @@ local MerchantDataProvider do
     function MerchantDataProvider:UpdateMerchantItemByID(itemID, checkCostItems)
         local items = self:GetMerchantItems(function(itemData)
             if itemData.merchantItemID == itemID then
-                return not itemData:IsFiltered()
+                return true
             elseif checkCostItems then
                 for i = 1, itemData.extendedCostCount do
                     local costItem = itemData.extendedCostItems[i]
                     if costItem.itemID == itemID then
-                        return not itemData:IsFiltered()
+                        return true
                     end
                 end
             end
@@ -694,17 +681,16 @@ local MerchantDataProvider do
         end
     end
 
-    ---@param predicate DataProviderPredicate|true|nil
+    ---@param predicate? DataProviderPredicate
     ---@return DataProviderItemData[] merchantItems
     function MerchantDataProvider:GetMerchantItems(predicate)
-        if predicate == true then
-        elseif type(predicate) ~= "function" then
-            predicate = self.FilterPreset.IsNotFiltered
+        if type(predicate) ~= "function" then
+            predicate = nil
         end
         local collection = {} ---@type DataProviderItemData
         local index = 0
         for _, itemData in ipairs(self.collection) do
-            if predicate == true or predicate(itemData) then
+            if not predicate or predicate(itemData) then
                 index = index + 1
                 collection[index] = itemData
             end
@@ -721,6 +707,18 @@ local MerchantDataProvider do
     ---@return boolean hasMerchantItems
     function MerchantDataProvider:HasMerchantItems()
         return not not self.collection[1]
+    end
+
+    function MerchantDataProvider:HasMerchantPendingItems()
+        if not self.isReady then
+            return 1
+        end
+        for _, itemData in ipairs(self.collection) do
+            if itemData:IsPending() then
+                return true
+            end
+        end
+        return false
     end
 
     local function UpdateMerchant()
@@ -746,11 +744,15 @@ local MerchantDataProvider do
     function Service:OnEvent(event, ...)
         if event == "MERCHANT_SHOW" then
             FrameUtil.RegisterFrameForEvents(self, self.MerchantEvents)
-            MerchantDataProvider:UpdateMerchant()
-            MerchantDataProvider:UpdateMerchantPendingItems()
+            MerchantDataProvider:UpdateMerchant(true)
         elseif event == "MERCHANT_CLOSED" then
             FrameUtil.UnregisterFrameForEvents(self, self.MerchantEvents)
             MerchantDataProvider:UpdateMerchant()
+        elseif event == "UNIT_INVENTORY_CHANGED" then
+            local unit = ...
+            if unit == "player" then
+                MerchantDataProvider:UpdateMerchantStockItems()
+            end
         elseif event == "MERCHANT_UPDATE" then
             MerchantDataProvider:UpdateMerchantPendingItems()
         elseif event == "MERCHANT_FILTER_ITEM_UPDATE" then
@@ -766,11 +768,11 @@ local MerchantDataProvider do
             if success then
                 MerchantDataProvider:UpdateMerchantItemByID(itemID, true)
             end
-        elseif event == "UNIT_INVENTORY_CHANGED" then
-            local unit = ...
-            if unit == "player" then
-                MerchantDataProvider:UpdateMerchantStockItems()
-            end
+        end
+        if MerchantDataProvider:HasMerchantPendingItems() then
+            Service:StartPending()
+        else
+            Service:StopPending()
         end
     end
 
@@ -778,6 +780,139 @@ local MerchantDataProvider do
     Service:RegisterEvent("MERCHANT_SHOW")
     Service:RegisterEvent("MERCHANT_CLOSED")
     Service:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
+
+    local PendingTicker
+
+    local function PendingTick()
+        if MerchantDataProvider:HasMerchantPendingItems() then
+            MerchantDataProvider:UpdateMerchantPendingItems()
+        else
+            Service:StopPending()
+        end
+    end
+
+    function Service:StartPending()
+        if PendingTicker then
+            return
+        end
+        PendingTicker = C_Timer.NewTicker(0.25, PendingTick)
+    end
+
+    function Service:StopPending()
+        if not PendingTicker then
+            return
+        end
+        PendingTicker:Cancel()
+        PendingTicker = nil
+    end
+
+end
+
+---@class MerchantItemProvider
+local MerchantItemProvider do
+
+    ---@alias MerchantItemProviderEvent DataProviderEvent|"OnMerchantItemsShow"|"OnMerchantItemsUpdate"|"OnMerchantItemsReady"|"OnMerchantItemsHide"
+
+    ---@class MerchantItemProvider : DataProvider
+    ---@field public Event table<MerchantItemProviderEvent, number>
+    ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: MerchantItemProviderEvent[])
+
+    MerchantItemProvider = CreateDataProvider() ---@type MerchantItemProvider
+
+    MerchantItemProvider:GenerateCallbackEvents({
+        "OnMerchantItemsShow",
+        "OnMerchantItemsUpdate",
+        "OnMerchantItemsReady",
+        "OnMerchantItemsHide",
+    })
+
+    ---@alias MerchantItemFilter fun(itemData: MerchantItem): boolean?
+
+    -- ---@type MerchantItemFilter[]
+    -- MerchantItemProvider.Filters = {}
+
+    -- ---@type table<MerchantItem, boolean?>
+    -- MerchantItemProvider.Filtered = {}
+
+    -- function MerchantItemProvider:InternalFlush()
+    --     self:Flush()
+    --     table.wipe(self.Filtered)
+    -- end
+
+    -- ---@param items MerchantItem[]
+    -- function MerchantItemProvider:InternalInsert(items)
+    --     local collection = {}
+    --     local index = 0
+    --     for _, itemData in ipairs(items) do
+    --         local filtered
+    --         for _, filter in ipairs(self.Filters) do
+    --             if filter(itemData) then
+    --                 filtered = true
+    --                 break
+    --             else
+    --                 filtered = false
+    --             end
+    --         end
+    --         if not filtered then
+    --             index = index + 1
+    --             collection[index] = itemData
+    --         end
+    --     end
+    --     self:InsertTable(collection)
+    -- end
+
+    -- function MerchantItemProvider:Enumerate()
+    --     local index = 0
+    --     local itemData
+    --     return function()
+    --         repeat
+    --             index = index + 1
+    --             itemData = self.collection[index]
+    --             if not itemData then
+    --                 return
+    --             end
+    --             if not self.Filtered[itemData] then
+    --                 break
+    --             end
+    --         until not itemData
+    --         return itemData
+    --     end
+    -- end
+
+    local function OnShow()
+        MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsShow)
+    end
+
+    ---@param isFullUpdate boolean
+    local function OnReady(isFullUpdate)
+        local items = MerchantDataProvider:GetMerchantItems()
+        -- print(#items) -- TODO: during a full update maybe we just want to swap out the contents without actually flushing and inserting the provider like we currently do?
+        MerchantItemProvider:Flush()
+        MerchantItemProvider:InsertTable(items)
+        if isFullUpdate == true then
+            MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsUpdate)
+        else
+            MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsReady)
+        end
+    end
+
+    ---@param isReady boolean
+    local function OnUpdate(_, isReady)
+        if isReady ~= true then
+            return
+        end
+        OnReady(true)
+    end
+
+    local function OnHide()
+        MerchantItemProvider:Flush()
+        MerchantItemProvider:TriggerEvent(MerchantItemProvider.Event.OnMerchantItemsHide)
+    end
+
+    MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantShow, OnShow)
+    MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantReady, OnReady)
+    MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantUpdate, OnUpdate)
+    MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantHide, OnHide)
 
 end
 
@@ -940,7 +1075,7 @@ local Frame do
             ---@alias ScrollBoxElementData MerchantItem
             ---@alias ScrollBoxView ViewPolyfill
             ---@alias ScrollBoxTarget Frame
-            ---@alias ScrollBoxDataProvider MerchantDataProvider
+            ---@alias ScrollBoxDataProvider MerchantItemProvider
             ---@alias ScrollBoxFrameData any
             ---@alias ScrollBoxFrame Frame
             ---@alias ScrollBoxBaseEvents "OnAllowScrollChanged"|"OnSizeChanged"|"OnScroll"|"OnLayout"
@@ -1100,17 +1235,15 @@ local Frame do
                 view:SetPadding(2, 2, 2, 2, 0)
                 ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view)
 
-                self.ScrollBox:SetDataProvider(MerchantDataProvider)
+                self.ScrollBox:SetDataProvider(MerchantItemProvider)
 
-                local function Refresh(_, isReady)
-                    if isReady == false then
-                        return
-                    end
+                local function Refresh()
                     self.ScrollBox:Update()
                 end
 
-                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantUpdate, Refresh)
-                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnMerchantUpdateFilters, Refresh)
+                MerchantItemProvider:RegisterCallback(MerchantItemProvider.Event.OnMerchantItemsShow, Refresh)
+                MerchantItemProvider:RegisterCallback(MerchantItemProvider.Event.OnMerchantItemsReady, Refresh)
+                MerchantItemProvider:RegisterCallback(MerchantItemProvider.Event.OnMerchantItemsUpdate, Refresh)
 
             end
 
