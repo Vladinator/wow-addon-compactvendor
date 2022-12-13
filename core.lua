@@ -29,15 +29,6 @@ local MerchantPrevPageButton = MerchantPrevPageButton ---@type Button
 local addonName, ---@type string CompactVendor
     ns = ... ---@class CompactVendorNS
 
-local ConfirmationRequirementForVendors = {
-    [151950] = false, -- Mrrglrlr
-    [151951] = false, -- Grrmrlg
-    [151952] = false, -- Flrggrl
-    [151953] = false, -- Hurlgrl
-    [152084] = true, -- Mrrl
-    [152593] = false, -- Murloco
-}
-
 local ItemQualityColorToHexColor
 local ItemHexColorToQualityIndex
 local ColorPreset
@@ -277,6 +268,15 @@ local UpdateMerchantItemButton do
 
     local MerchantItem = {} ---@class MerchantItem
 
+    MerchantItem.ConfirmationRequirementForVendors = {
+        [151950] = false, -- Mrrglrlr
+        [151951] = false, -- Grrmrlg
+        [151952] = false, -- Flrggrl
+        [151953] = false, -- Hurlgrl
+        [152084] = true, -- Mrrl
+        [152593] = false, -- Murloco
+    }
+
     ---@param parent MerchantScanner
     ---@param index number
     function MerchantItem:OnLoad(parent, index)
@@ -462,7 +462,7 @@ local UpdateMerchantItemButton do
     function MerchantItem:CanSkipConfirmation()
         local guid = self.parent:GetMerchantInfo()
         local npcType, npcID = GetInfoFromGUID(guid)
-        if (npcType == "Creature" or npcType == "Vehicle" or npcType == "GameObject") and (npcID and ConfirmationRequirementForVendors[npcID]) then
+        if (npcType == "Creature" or npcType == "Vehicle" or npcType == "GameObject") and (npcID and self.ConfirmationRequirementForVendors[npcID]) then
             return false
         end
         if self.extendedCostCount ~= 0 or self:CanBeRefunded() then
@@ -917,11 +917,11 @@ local MerchantDataProvider do
 
 end
 
----@class CompactVendorFrame : Frame
+---@class CompactVendorFrame
 local Frame do
 
-    ---@diagnostic disable-next-line: assign-type-mismatch
-    Frame = CreateFrame("Frame", addonName .. "Frame", MerchantBuyBackItem) ---@type CompactVendorFrame
+    ---@diagnostic disable-next-line: cast-local-type
+    Frame = CreateFrame("Frame", addonName .. "Frame", MerchantBuyBackItem) ---@class CompactVendorFrame : Frame
 
     ---@type WowEvent[]
     Frame.Events = {
@@ -939,328 +939,323 @@ local Frame do
         end
     end
 
+    function Frame:ModifyMerchantFrame()
+
+        MerchantBuyBackItem:ClearAllPoints()
+        MerchantBuyBackItem:SetPoint("BOTTOMRIGHT", -7, 33)
+
+        for i = 1, 10 do
+            _G["MerchantItem" .. i]:SetParent(MerchantItem11)
+        end
+
+        ---@param ... Region
+        local function ForceHidden(...)
+            local frames = {...}
+            for _, frame in pairs(frames) do
+                frame.Show = frame.Hide
+                frame:Hide()
+            end
+        end
+
+        ForceHidden(MerchantNextPageButton, MerchantPrevPageButton, MerchantPageText)
+
+    end
+
+    function Frame:CreateSearchBox()
+
+        ---@class CompactVendorFrameSearchBox : EditBox
+        ---@field public clearButton Button
+
+        ---@diagnostic disable-next-line: assign-type-mismatch
+        self.Search = CreateFrame("EditBox", nil, self, "SearchBoxTemplate") ---@type CompactVendorFrameSearchBox
+        self.Search:SetSize(102, 32)
+        self.Search:SetMultiLine(false)
+        self.Search:SetMaxLetters(255)
+        self.Search:SetCountInvisibleLetters(true)
+        self.Search:SetAutoFocus(false)
+
+        SearchBoxTemplate_OnLoad(self.Search)
+
+        if MerchantFrameLootFilter then
+            self.Search:SetPoint("RIGHT", MerchantFrameLootFilter, "LEFT", 14, 3)
+        else
+            self.Search:SetPoint("LEFT", MerchantFramePortrait, "RIGHT", 12, -19)
+            self.Search:SetPoint("RIGHT", MerchantFrame, "RIGHT", -12, 0)
+        end
+
+        function self.Search:OnHide()
+            self.clearButton:Click()
+            BagSearch_OnTextChanged(self)
+        end
+
+        function self.Search:OnTextChanged()
+            SearchBoxTemplate_OnTextChanged(self)
+        end
+
+        function self.Search:OnChar()
+            BagSearch_OnChar(self)
+        end
+
+        function self.Search:OnEnter()
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
+            GameTooltip:AddLine("Enter an item name to search")
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddDoubleLine("Type search:", "bop   bou   boe", nil, nil, nil, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "boa  quest", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "l:120  lvl:<120  level:>=120", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "q:epic   q:4", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "t:leather   t:shield", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "n:water   name:water", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "s:heal   set:heal", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "tt:binds   tip:binds   tooltip:binds", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine("Modifiers:", "&   Match both", nil, nil, nil, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "|   Match either", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "!   Do not match", 255, 255, 255, 255, 255, 255)
+            GameTooltip:AddDoubleLine(" ", "> < <= >=   Numerical comparisons", 255, 255, 255, 255, 255, 255)
+            GameTooltip:Show()
+        end
+
+        function self.Search:OnLeave()
+            GameTooltip:Hide()
+        end
+
+        self.Search:SetScript("OnHide", self.Search.OnHide)
+        self.Search:SetScript("OnTextChanged", self.Search.OnTextChanged)
+        self.Search:SetScript("OnChar", self.Search.OnChar)
+        self.Search:SetScript("OnEnter", self.Search.OnEnter)
+        self.Search:SetScript("OnLeave", self.Search.OnLeave)
+
+    end
+
+    function Frame:CreateScrollBox()
+
+        ---@alias ViewScrollBoxFrame Frame
+        ---@alias ViewScrollBoxScrollTarget EventFrame
+        ---@alias ViewScrollBox CompactVendorFrameScrollBox
+        ---@alias ViewScrollBoxElement CompactVendorFrameMerchantButtonTemplate
+        ---@alias ViewScrollBoxElementData MerchantItem
+        ---@alias ViewPolyfillLayoutFunction fun(index: number, frame: ViewScrollBoxFrame, offset: number, scrollTarget: ViewScrollBoxScrollTarget): any
+        ---@alias ViewPolyfillElementInitializerFunction fun(self: ViewScrollBoxElement, elementData: ViewScrollBoxElementData)
+        ---@alias ViewPolyfillElementFactoryFunction fun(factory: fun(), elementData: ViewScrollBoxElementData)
+
+        ---@class ViewPolyfill
+        ---@field public templateInfos table<string, table<string, any>>
+        ---@field public SetPadding fun(self: ViewPolyfill, top?: number, bottom?: number, left?: number, right?: number, spacing?: number)
+        ---@field public GetSpacing fun(self: ViewPolyfill): number
+        ---@field public GetStride fun(self: ViewPolyfill): number
+        ---@field public LayoutInternal fun(self: ViewPolyfill, layoutFunction: ViewPolyfillLayoutFunction): number
+        ---@field public SetElementIndentCalculator fun(self: ViewPolyfill, elementIndentCalculator: number)
+        ---@field public GetElementIndent fun(self: ViewPolyfill, frame: ViewScrollBoxFrame): number
+        ---@field public GetLayoutFunction fun(self, ViewPolyfill): ViewPolyfillLayoutFunction
+        ---@field public Layout fun(self, ViewPolyfill): number
+        ---@field public Init fun(self: ViewPolyfill, top?: number, bottom?: number, left?: number, right?: number, spacing?: number)
+        ---@field public CalculateDataIndices fun(self: ViewPolyfill, scrollBox: ViewScrollBox): number
+        ---@field public GetExtent fun(self: ViewPolyfill, scrollBox: ViewScrollBox): any
+        ---@field public RecalculateExtent fun(self: ViewPolyfill, scrollBox: ViewScrollBox): any
+        ---@field public GetExtentUntil fun(self: ViewPolyfill, scrollBox: ViewScrollBox, dataIndex: number): any
+        ---@field public GetPanExtent fun(self: ViewPolyfill): boolean
+        ---@field public SetElementInitializer fun(self: ViewPolyfill, frameTemplateOrFrameType: string, initializer: ViewPolyfillElementInitializerFunction)
+
+        ---@alias ScrollBoxElementData MerchantItem
+        ---@alias ScrollBoxView ViewPolyfill
+        ---@alias ScrollBoxTarget Frame
+        ---@alias ScrollBoxDataProvider MerchantDataProvider
+        ---@alias ScrollBoxFrameData any
+        ---@alias ScrollBoxFrame Frame
+        ---@alias ScrollBoxBaseEvents "OnAllowScrollChanged"|"OnSizeChanged"|"OnScroll"|"OnLayout"
+        ---@alias ScrollBoxListEvents ScrollBoxBaseEvents|"OnAcquiredFrame"|"OnInitializedFrame"|"OnReleasedFrame"|"OnDataRangeChanged"|"OnUpdate"
+        ---@alias ScrollBoxForEachFunction fun(elementData: ScrollBoxElementData)
+        ---@alias ScrollBoxPredicateFunction fun(elementData: ScrollBoxElementData): boolean?
+
+        ---@enum ScrollBoxViewAlignment
+        local ScrollBoxViewAlignment = {
+            AlignBegin = 0,
+            AlignCenter = 0.5,
+            AlignEnd = 1,
+            AlignNearest = -1,
+        }
+
+        local MathUtilEpsilon = MathUtil.Epsilon
+
+        ---@enum ScrollBoxScrollDirection
+        local ScrollBoxScrollDirection = {
+            ScrollBegin = MathUtilEpsilon,
+            ScrollEnd = 1 - MathUtilEpsilon,
+        }
+
+        ---@class ScrollBoxBase
+        ---@field public Event table<ScrollBoxBaseEvents, number>
+        ---@field public SetView fun(self: ScrollBoxBase, view: ScrollBoxView)
+        ---@field public Update fun(self: ScrollBoxBase, forceLayout?: boolean)
+
+        ---@class ScrollBoxMixin : ScrollBoxBase, CallbackRegistry
+        ---@field public OnLoad fun(self: ScrollBoxMixin)
+        ---@field public Init fun(self: ScrollBoxMixin, view: ScrollBoxView)
+        ---@field public SetView fun(self: ScrollBoxMixin, view: ScrollBoxView)
+        ---@field public GetView fun(self: ScrollBoxMixin): ScrollBoxView
+        ---@field public GetScrollTarget fun(self: ScrollBoxMixin): ScrollBoxTarget
+        ---@field public OnScrollTargetSizeChanged fun(self: ScrollBoxMixin, width: number, height: number)
+        ---@field public OnSizeChanged fun(self: ScrollBoxMixin, width: number, height: number)
+        ---@field public FullUpdate fun(self: ScrollBoxMixin, immediately?: boolean)
+        ---@field public SetUpdateLocked fun(self: ScrollBoxMixin, locked?: boolean)
+        ---@field public IsUpdateLocked fun(self: ScrollBoxMixin): boolean
+        ---@field public FullUpdateInternal fun(self: ScrollBoxMixin)
+        ---@field public Layout fun(self: ScrollBoxMixin)
+        ---@field public SetScrollTargetOffset fun(self: ScrollBoxMixin, offset: number)
+        ---@field public ScrollInDirection fun(self: ScrollBoxMixin, scrollPercentage: number, direction: ScrollBoxScrollDirection)
+        ---@field public ScrollToBegin fun(self: ScrollBoxMixin, noInterpolation?: boolean)
+        ---@field public ScrollToEnd fun(self: ScrollBoxMixin, noInterpolation?: boolean)
+        ---@field public IsAtBegin fun(self: ScrollBoxMixin): boolean
+        ---@field public IsAtEnd fun(self: ScrollBoxMixin): boolean
+        ---@field public SetScrollPercentage fun(self: ScrollBoxMixin, scrollPercentage: number, noInterpolation?: boolean)
+        ---@field public SetScrollPercentageInternal fun(self: ScrollBoxMixin, scrollPercentage: number)
+        ---@field public GetVisibleExtentPercentage fun(self: ScrollBoxMixin): number
+        ---@field public GetPanExtent fun(self: ScrollBoxMixin)
+        ---@field public SetPanExtent fun(self: ScrollBoxMixin, panExtent: any)
+        ---@field public GetExtent fun(self: ScrollBoxMixin): any
+        ---@field public GetVisibleExtent fun(self: ScrollBoxMixin): any
+        ---@field public GetFrames fun(self: ScrollBoxMixin): ScrollBoxFrame[]
+        ---@field public GetFrameCount fun(self: ScrollBoxMixin): number
+        ---@field public FindFrame fun(self: ScrollBoxMixin, elementData: ScrollBoxFrameData): ScrollBoxFrame
+        ---@field public FindFrameByPredicate fun(self: ScrollBoxMixin, predicate: ScrollBoxPredicateFunction): ScrollBoxFrame?
+        ---@field public ScrollToFrame fun(self: ScrollBoxMixin, frame: ScrollBoxFrame, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
+        ---@field public CalculatePanExtentPercentage fun(self: ScrollBoxMixin): number
+        ---@field public CalculateScrollPercentage fun(self: ScrollBoxMixin): number
+        ---@field public HasScrollableExtent fun(self: ScrollBoxMixin): boolean
+        ---@field public SetScrollAllowed fun(self: ScrollBoxMixin, allowScroll: boolean)
+        ---@field public GetDerivedScrollRange fun(self: ScrollBoxMixin): number
+        ---@field public GetDerivedScrollOffset fun(self: ScrollBoxMixin): number
+        ---@field public SetAlignmentOverlapIgnored fun(self: ScrollBoxMixin, ignored: boolean)
+        ---@field public IsAlignmentOverlapIgnored fun(self: ScrollBoxMixin): boolean
+        ---@field public SanitizeAlignment fun(self: ScrollBoxMixin, alignment: ScrollBoxViewAlignment, extent: any): ScrollBoxViewAlignment
+        ---@field public ScrollToOffset fun(self: ScrollBoxMixin, offset: number, frameExtent?: any, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
+        ---@field public RecalculateDerivedExtent fun(self: ScrollBoxMixin)
+        ---@field public GetDerivedExtent fun(self: ScrollBoxMixin): number
+        ---@field public SetPadding fun(self: ScrollBoxMixin, padding: number)
+        ---@field public GetPadding fun(self: ScrollBoxMixin): number
+        ---@field public GetLeftPadding fun(self: ScrollBoxMixin): number
+        ---@field public GetTopPadding fun(self: ScrollBoxMixin): number
+        ---@field public GetRightPadding fun(self: ScrollBoxMixin): number
+        ---@field public GetBottomPadding fun(self: ScrollBoxMixin): number
+        ---@field public GetUpperPadding fun(self: ScrollBoxMixin): number
+        ---@field public GetLowerPadding fun(self: ScrollBoxMixin): number
+
+        ---@class ScrollBoxListMixin : ScrollBoxMixin
+        ---@field public Event table<ScrollBoxListEvents, number>
+        ---@field public Init fun(self: ScrollBoxListMixin)
+        ---@field public Flush fun(self: ScrollBoxListMixin)
+        ---@field public ForEachFrame fun(self: ScrollBoxListMixin, func: ScrollBoxForEachFunction)
+        ---@field public EnumerateFrames fun(self: ScrollBoxListMixin): fun(): fun(): number, ScrollBoxElementData
+        ---@field public FindElementDataByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction): ScrollBoxElementData?
+        ---@field public FindElementDataIndexByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction): ScrollBoxElementData?
+        ---@field public FindByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction): ScrollBoxElementData?
+        ---@field public Find fun(self: ScrollBoxListMixin, index: number): ScrollBoxElementData
+        ---@field public FindIndex fun(self: ScrollBoxListMixin, elementData: ScrollBoxElementData): number?
+        ---@field public InsertElementData fun(self: ScrollBoxListMixin, ...: ScrollBoxElementData)
+        ---@field public InsertElementDataTable fun(self: ScrollBoxListMixin, tbl: ScrollBoxElementData[])
+        ---@field public InsertElementDataTableRange fun(self: ScrollBoxListMixin, tbl: ScrollBoxElementData[], indexBegin: number, indexEnd: number)
+        ---@field public ContainsElementDataByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction): boolean
+        ---@field public GetDataProvider fun(self: ScrollBoxListMixin): ScrollBoxDataProvider
+        ---@field public HasDataProvider fun(self: ScrollBoxListMixin): boolean
+        ---@field public ClearDataProvider fun(self: ScrollBoxListMixin)
+        ---@field public GetDataIndexBegin fun(self: ScrollBoxListMixin): number
+        ---@field public GetDataIndexEnd fun(self: ScrollBoxListMixin): number
+        ---@field public IsVirtualized fun(self: ScrollBoxListMixin): boolean
+        ---@field public GetElementExtent fun(self: ScrollBoxListMixin, dataIndex: number): ScrollBoxElementData
+        ---@field public GetExtentUntil fun(self: ScrollBoxListMixin, dataIndex: number): ScrollBoxElementData[]
+        ---@field public SetDataProvider fun(self: ScrollBoxListMixin, dataProvider: ScrollBoxDataProvider, retainScrollPosition?: boolean)
+        ---@field public GetDataProviderSize fun(self: ScrollBoxListMixin): number
+        ---@field public OnViewDataChanged fun(self: ScrollBoxListMixin)
+        ---@field public Rebuild fun(self: ScrollBoxListMixin)
+        ---@field public OnViewAcquiredFrame fun(self: ScrollBoxListMixin, frame: Region, elementData: ScrollBoxElementData, new: boolean)
+        ---@field public OnViewInitializedFrame fun(self: ScrollBoxListMixin, frame: Region, elementData: ScrollBoxElementData)
+        ---@field public OnViewReleasedFrame fun(self: ScrollBoxListMixin, frame: Region, oldElementData: ScrollBoxElementData)
+        ---@field public IsAcquireLocked fun(self: ScrollBoxListMixin): boolean
+        ---@field public FullUpdateInternal fun(self: ScrollBoxListMixin)
+        ---@field public ScrollToNearest fun(self: ScrollBoxListMixin, dataIndex: number, noInterpolation?: boolean): number
+        ---@field public ScrollToElementDataIndex fun(self: ScrollBoxListMixin, dataIndex: number, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
+        ---@field public ScrollToElementData fun(self: ScrollBoxListMixin, elementData: ScrollBoxElementData, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
+        ---@field public ScrollToElementDataByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
+
+        ---@class WowScrollBoxList : ScrollBoxListMixin, Frame
+        ---@field public canInterpolateScroll boolean false
+        ---@field public ScrollTarget EventFrame
+        ---@field public Shadows Frame
+
+        ---@class CompactVendorFrameScrollBox : WowScrollBoxList
+
+        self.ScrollBox = CreateFrame("Frame", nil, self, "WowScrollBoxList") ---@class CompactVendorFrameScrollBox
+        self.ScrollBox:SetSize(466, 386)
+        self.ScrollBox:SetPoint("TOPLEFT", 7, -64)
+        self.ScrollBox:SetAllPoints()
+
+        ---@class EventFrame : Frame
+        ---@field public Event table<"OnHide"|"OnShow"|"OnSizeChanged", number>
+        ---@field public OnLoad_Intrinsic fun(self: EventFrame)
+        ---@field public OnHide_Intrinsic fun(self: EventFrame)
+        ---@field public OnShow_Intrinsic fun(self: EventFrame)
+        ---@field public OnSizeChanged_Intrinsic fun(self: EventFrame, width: number, height: number)
+
+        ---@class WowTrimScrollBar : Frame
+        ---@field public minThumbExtent number 23
+        ---@field public Backplate Texture
+        ---@field public Background Frame
+        ---@field public Track Frame
+        ---@field public Back Button
+        ---@field public Forward Button
+        ---@field public OnLoad fun(self: WowTrimScrollBar)
+
+        ---@class CompactVendorFrameScrollBar : EventFrame, WowTrimScrollBar
+
+        self.ScrollBar = CreateFrame("EventFrame", nil, self, "WowTrimScrollBar") ---@class CompactVendorFrameScrollBar
+        self.ScrollBar:SetPoint("TOPLEFT", self.ScrollBox, "TOPRIGHT", -1, 2)
+        self.ScrollBar:SetPoint("BOTTOMLEFT", self.ScrollBox, "BOTTOMRIGHT", -1, -3)
+
+        local view = CreateScrollBoxListLinearView() ---@type ViewPolyfill
+        view.templateInfos["CompactVendorFrameMerchantButtonTemplate"] = { type = "Button", width = 300, height = 24, keyValues = {} }
+        view:SetElementInitializer("CompactVendorFrameMerchantButtonTemplate", CreateMerchantItemButton)
+        view:SetPadding(2, 2, 2, 2, 0)
+        ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view)
+
+        self.ScrollBox:SetDataProvider(MerchantDataProvider)
+
+        local scrollPercentage
+
+        local function OnPreUpdate()
+            if scrollPercentage then
+                return
+            end
+            scrollPercentage = self.ScrollBox:CalculateScrollPercentage()
+        end
+
+        local function OnPostUpdate()
+            if not scrollPercentage then
+                return
+            end
+            self.ScrollBox:SetScrollPercentage(scrollPercentage)
+            scrollPercentage = nil
+        end
+
+        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPreUpdate, OnPreUpdate)
+        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, OnPostUpdate)
+
+    end
+
     function Frame:OnLoad()
 
-        do
+        self:SetFrameStrata("HIGH")
 
-            MerchantBuyBackItem:ClearAllPoints()
-            MerchantBuyBackItem:SetPoint("BOTTOMRIGHT", -7, 33)
+        self:SetPoint("TOPLEFT", MerchantFrameInset, "TOPLEFT", 3, -2)
+        self:SetPoint("BOTTOMRIGHT", MerchantFrameInset, "BOTTOMRIGHT", -20, 55)
 
-            for i = 1, 10 do
-                _G["MerchantItem" .. i]:SetParent(MerchantItem11)
-            end
+        self:SetScript("OnShow", self.OnShow)
+        self:SetScript("OnHide", self.OnHide)
+        self:SetScript("OnEvent", self.OnEvent)
+        FrameUtil.RegisterFrameForEvents(self, self.Events)
 
-            ---@param ... Region
-            local function ForceHidden(...)
-                local frames = {...}
-                for _, frame in pairs(frames) do
-                    frame.Show = frame.Hide
-                    frame:Hide()
-                end
-            end
-
-            ForceHidden(MerchantNextPageButton, MerchantPrevPageButton, MerchantPageText)
-
-        end
-
-        do
-
-            self:SetFrameStrata("HIGH")
-
-            self:SetPoint("TOPLEFT", MerchantFrameInset, "TOPLEFT", 3, -2)
-            self:SetPoint("BOTTOMRIGHT", MerchantFrameInset, "BOTTOMRIGHT", -20, 55)
-
-            self:SetScript("OnEvent", self.OnEvent)
-            FrameUtil.RegisterFrameForEvents(self, self.Events)
-
-            self:SetScript("OnShow", self.OnShow)
-            self:SetScript("OnHide", self.OnHide)
-
-        end
-
-        do
-
-            ---@class CompactVendorFrameSearchBox : EditBox
-            ---@field public clearButton Button
-
-            ---@diagnostic disable-next-line: assign-type-mismatch
-            self.Search = CreateFrame("EditBox", nil, self, "SearchBoxTemplate") ---@type CompactVendorFrameSearchBox
-            self.Search:SetSize(102, 32)
-            self.Search:SetMultiLine(false)
-            self.Search:SetMaxLetters(255)
-            self.Search:SetCountInvisibleLetters(true)
-            self.Search:SetAutoFocus(false)
-
-            do
-
-                SearchBoxTemplate_OnLoad(self.Search)
-
-                if MerchantFrameLootFilter then
-                    self.Search:SetPoint("RIGHT", MerchantFrameLootFilter, "LEFT", 14, 3)
-                else
-                    self.Search:SetPoint("LEFT", MerchantFramePortrait, "RIGHT", 12, -19)
-                    self.Search:SetPoint("RIGHT", MerchantFrame, "RIGHT", -12, 0)
-                end
-
-                function self.Search:OnHide()
-                    self.clearButton:Click()
-                    BagSearch_OnTextChanged(self)
-                end
-
-                function self.Search:OnTextChanged()
-                    SearchBoxTemplate_OnTextChanged(self)
-                end
-
-                function self.Search:OnChar()
-                    BagSearch_OnChar(self)
-                end
-
-                function self.Search:OnEnter()
-                    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
-                    GameTooltip:AddLine("Enter an item name to search")
-                    GameTooltip:AddLine(" ")
-                    GameTooltip:AddDoubleLine("Type search:", "bop   bou   boe", nil, nil, nil, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "boa  quest", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "l:120  lvl:<120  level:>=120", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "q:epic   q:4", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "t:leather   t:shield", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "n:water   name:water", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "s:heal   set:heal", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "tt:binds   tip:binds   tooltip:binds", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine("Modifiers:", "&   Match both", nil, nil, nil, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "|   Match either", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "!   Do not match", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:AddDoubleLine(" ", "> < <= >=   Numerical comparisons", 255, 255, 255, 255, 255, 255)
-                    GameTooltip:Show()
-                end
-
-                function self.Search:OnLeave()
-                    GameTooltip:Hide()
-                end
-
-                self.Search:SetScript("OnHide", self.Search.OnHide)
-                self.Search:SetScript("OnTextChanged", self.Search.OnTextChanged)
-                self.Search:SetScript("OnChar", self.Search.OnChar)
-                self.Search:SetScript("OnEnter", self.Search.OnEnter)
-                self.Search:SetScript("OnLeave", self.Search.OnLeave)
-
-            end
-
-            ---@alias ViewScrollBoxFrame Frame
-            ---@alias ViewScrollBoxScrollTarget EventFrame
-            ---@alias ViewScrollBox CompactVendorFrameScrollBox
-            ---@alias ViewScrollBoxElement CompactVendorFrameMerchantButtonTemplate
-            ---@alias ViewScrollBoxElementData MerchantItem
-            ---@alias ViewPolyfillLayoutFunction fun(index: number, frame: ViewScrollBoxFrame, offset: number, scrollTarget: ViewScrollBoxScrollTarget): any
-            ---@alias ViewPolyfillElementInitializerFunction fun(self: ViewScrollBoxElement, elementData: ViewScrollBoxElementData)
-            ---@alias ViewPolyfillElementFactoryFunction fun(factory: fun(), elementData: ViewScrollBoxElementData)
-
-            ---@class ViewPolyfill
-            ---@field public templateInfos table<string, table<string, any>>
-            ---@field public SetPadding fun(self: ViewPolyfill, top?: number, bottom?: number, left?: number, right?: number, spacing?: number)
-            ---@field public GetSpacing fun(self: ViewPolyfill): number
-            ---@field public GetStride fun(self: ViewPolyfill): number
-            ---@field public LayoutInternal fun(self: ViewPolyfill, layoutFunction: ViewPolyfillLayoutFunction): number
-            ---@field public SetElementIndentCalculator fun(self: ViewPolyfill, elementIndentCalculator: number)
-            ---@field public GetElementIndent fun(self: ViewPolyfill, frame: ViewScrollBoxFrame): number
-            ---@field public GetLayoutFunction fun(self, ViewPolyfill): ViewPolyfillLayoutFunction
-            ---@field public Layout fun(self, ViewPolyfill): number
-            ---@field public Init fun(self: ViewPolyfill, top?: number, bottom?: number, left?: number, right?: number, spacing?: number)
-            ---@field public CalculateDataIndices fun(self: ViewPolyfill, scrollBox: ViewScrollBox): number
-            ---@field public GetExtent fun(self: ViewPolyfill, scrollBox: ViewScrollBox): any
-            ---@field public RecalculateExtent fun(self: ViewPolyfill, scrollBox: ViewScrollBox): any
-            ---@field public GetExtentUntil fun(self: ViewPolyfill, scrollBox: ViewScrollBox, dataIndex: number): any
-            ---@field public GetPanExtent fun(self: ViewPolyfill): boolean
-            ---@field public SetElementInitializer fun(self: ViewPolyfill, frameTemplateOrFrameType: string, initializer: ViewPolyfillElementInitializerFunction)
-
-            ---@alias ScrollBoxElementData MerchantItem
-            ---@alias ScrollBoxView ViewPolyfill
-            ---@alias ScrollBoxTarget Frame
-            ---@alias ScrollBoxDataProvider MerchantDataProvider
-            ---@alias ScrollBoxFrameData any
-            ---@alias ScrollBoxFrame Frame
-            ---@alias ScrollBoxBaseEvents "OnAllowScrollChanged"|"OnSizeChanged"|"OnScroll"|"OnLayout"
-            ---@alias ScrollBoxListEvents ScrollBoxBaseEvents|"OnAcquiredFrame"|"OnInitializedFrame"|"OnReleasedFrame"|"OnDataRangeChanged"|"OnUpdate"
-            ---@alias ScrollBoxForEachFunction fun(elementData: ScrollBoxElementData)
-            ---@alias ScrollBoxPredicateFunction fun(elementData: ScrollBoxElementData): boolean?
-
-            ---@enum ScrollBoxViewAlignment
-            local ScrollBoxViewAlignment = {
-                AlignBegin = 0,
-                AlignCenter = 0.5,
-                AlignEnd = 1,
-                AlignNearest = -1,
-            }
-
-            local MathUtilEpsilon = MathUtil.Epsilon
-
-            ---@enum ScrollBoxScrollDirection
-            local ScrollBoxScrollDirection = {
-                ScrollBegin = MathUtilEpsilon,
-                ScrollEnd = 1 - MathUtilEpsilon,
-            }
-
-            ---@class ScrollBoxBase
-            ---@field public Event table<ScrollBoxBaseEvents, number>
-            ---@field public SetView fun(self: ScrollBoxBase, view: ScrollBoxView)
-            ---@field public Update fun(self: ScrollBoxBase, forceLayout?: boolean)
-
-            ---@class ScrollBoxMixin : ScrollBoxBase, CallbackRegistry
-            ---@field public OnLoad fun(self: ScrollBoxMixin)
-            ---@field public Init fun(self: ScrollBoxMixin, view: ScrollBoxView)
-            ---@field public SetView fun(self: ScrollBoxMixin, view: ScrollBoxView)
-            ---@field public GetView fun(self: ScrollBoxMixin): ScrollBoxView
-            ---@field public GetScrollTarget fun(self: ScrollBoxMixin): ScrollBoxTarget
-            ---@field public OnScrollTargetSizeChanged fun(self: ScrollBoxMixin, width: number, height: number)
-            ---@field public OnSizeChanged fun(self: ScrollBoxMixin, width: number, height: number)
-            ---@field public FullUpdate fun(self: ScrollBoxMixin, immediately?: boolean)
-            ---@field public SetUpdateLocked fun(self: ScrollBoxMixin, locked?: boolean)
-            ---@field public IsUpdateLocked fun(self: ScrollBoxMixin): boolean
-            ---@field public FullUpdateInternal fun(self: ScrollBoxMixin)
-            ---@field public Layout fun(self: ScrollBoxMixin)
-            ---@field public SetScrollTargetOffset fun(self: ScrollBoxMixin, offset: number)
-            ---@field public ScrollInDirection fun(self: ScrollBoxMixin, scrollPercentage: number, direction: ScrollBoxScrollDirection)
-            ---@field public ScrollToBegin fun(self: ScrollBoxMixin, noInterpolation?: boolean)
-            ---@field public ScrollToEnd fun(self: ScrollBoxMixin, noInterpolation?: boolean)
-            ---@field public IsAtBegin fun(self: ScrollBoxMixin): boolean
-            ---@field public IsAtEnd fun(self: ScrollBoxMixin): boolean
-            ---@field public SetScrollPercentage fun(self: ScrollBoxMixin, scrollPercentage: number, noInterpolation?: boolean)
-            ---@field public SetScrollPercentageInternal fun(self: ScrollBoxMixin, scrollPercentage: number)
-            ---@field public GetVisibleExtentPercentage fun(self: ScrollBoxMixin): number
-            ---@field public GetPanExtent fun(self: ScrollBoxMixin)
-            ---@field public SetPanExtent fun(self: ScrollBoxMixin, panExtent: any)
-            ---@field public GetExtent fun(self: ScrollBoxMixin): any
-            ---@field public GetVisibleExtent fun(self: ScrollBoxMixin): any
-            ---@field public GetFrames fun(self: ScrollBoxMixin): ScrollBoxFrame[]
-            ---@field public GetFrameCount fun(self: ScrollBoxMixin): number
-            ---@field public FindFrame fun(self: ScrollBoxMixin, elementData: ScrollBoxFrameData): ScrollBoxFrame
-            ---@field public FindFrameByPredicate fun(self: ScrollBoxMixin, predicate: ScrollBoxPredicateFunction): ScrollBoxFrame?
-            ---@field public ScrollToFrame fun(self: ScrollBoxMixin, frame: ScrollBoxFrame, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
-            ---@field public CalculatePanExtentPercentage fun(self: ScrollBoxMixin): number
-            ---@field public CalculateScrollPercentage fun(self: ScrollBoxMixin): number
-            ---@field public HasScrollableExtent fun(self: ScrollBoxMixin): boolean
-            ---@field public SetScrollAllowed fun(self: ScrollBoxMixin, allowScroll: boolean)
-            ---@field public GetDerivedScrollRange fun(self: ScrollBoxMixin): number
-            ---@field public GetDerivedScrollOffset fun(self: ScrollBoxMixin): number
-            ---@field public SetAlignmentOverlapIgnored fun(self: ScrollBoxMixin, ignored: boolean)
-            ---@field public IsAlignmentOverlapIgnored fun(self: ScrollBoxMixin): boolean
-            ---@field public SanitizeAlignment fun(self: ScrollBoxMixin, alignment: ScrollBoxViewAlignment, extent: any): ScrollBoxViewAlignment
-            ---@field public ScrollToOffset fun(self: ScrollBoxMixin, offset: number, frameExtent?: any, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
-            ---@field public RecalculateDerivedExtent fun(self: ScrollBoxMixin)
-            ---@field public GetDerivedExtent fun(self: ScrollBoxMixin): number
-            ---@field public SetPadding fun(self: ScrollBoxMixin, padding: number)
-            ---@field public GetPadding fun(self: ScrollBoxMixin): number
-            ---@field public GetLeftPadding fun(self: ScrollBoxMixin): number
-            ---@field public GetTopPadding fun(self: ScrollBoxMixin): number
-            ---@field public GetRightPadding fun(self: ScrollBoxMixin): number
-            ---@field public GetBottomPadding fun(self: ScrollBoxMixin): number
-            ---@field public GetUpperPadding fun(self: ScrollBoxMixin): number
-            ---@field public GetLowerPadding fun(self: ScrollBoxMixin): number
-
-            ---@class ScrollBoxListMixin : ScrollBoxMixin
-            ---@field public Event table<ScrollBoxListEvents, number>
-            ---@field public Init fun(self: ScrollBoxListMixin)
-            ---@field public Flush fun(self: ScrollBoxListMixin)
-            ---@field public ForEachFrame fun(self: ScrollBoxListMixin, func: ScrollBoxForEachFunction)
-            ---@field public EnumerateFrames fun(self: ScrollBoxListMixin): fun(): fun(): number, ScrollBoxElementData
-            ---@field public FindElementDataByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction): ScrollBoxElementData?
-            ---@field public FindElementDataIndexByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction): ScrollBoxElementData?
-            ---@field public FindByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction): ScrollBoxElementData?
-            ---@field public Find fun(self: ScrollBoxListMixin, index: number): ScrollBoxElementData
-            ---@field public FindIndex fun(self: ScrollBoxListMixin, elementData: ScrollBoxElementData): number?
-            ---@field public InsertElementData fun(self: ScrollBoxListMixin, ...: ScrollBoxElementData)
-            ---@field public InsertElementDataTable fun(self: ScrollBoxListMixin, tbl: ScrollBoxElementData[])
-            ---@field public InsertElementDataTableRange fun(self: ScrollBoxListMixin, tbl: ScrollBoxElementData[], indexBegin: number, indexEnd: number)
-            ---@field public ContainsElementDataByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction): boolean
-            ---@field public GetDataProvider fun(self: ScrollBoxListMixin): ScrollBoxDataProvider
-            ---@field public HasDataProvider fun(self: ScrollBoxListMixin): boolean
-            ---@field public ClearDataProvider fun(self: ScrollBoxListMixin)
-            ---@field public GetDataIndexBegin fun(self: ScrollBoxListMixin): number
-            ---@field public GetDataIndexEnd fun(self: ScrollBoxListMixin): number
-            ---@field public IsVirtualized fun(self: ScrollBoxListMixin): boolean
-            ---@field public GetElementExtent fun(self: ScrollBoxListMixin, dataIndex: number): ScrollBoxElementData
-            ---@field public GetExtentUntil fun(self: ScrollBoxListMixin, dataIndex: number): ScrollBoxElementData[]
-            ---@field public SetDataProvider fun(self: ScrollBoxListMixin, dataProvider: ScrollBoxDataProvider, retainScrollPosition?: boolean)
-            ---@field public GetDataProviderSize fun(self: ScrollBoxListMixin): number
-            ---@field public OnViewDataChanged fun(self: ScrollBoxListMixin)
-            ---@field public Rebuild fun(self: ScrollBoxListMixin)
-            ---@field public OnViewAcquiredFrame fun(self: ScrollBoxListMixin, frame: Region, elementData: ScrollBoxElementData, new: boolean)
-            ---@field public OnViewInitializedFrame fun(self: ScrollBoxListMixin, frame: Region, elementData: ScrollBoxElementData)
-            ---@field public OnViewReleasedFrame fun(self: ScrollBoxListMixin, frame: Region, oldElementData: ScrollBoxElementData)
-            ---@field public IsAcquireLocked fun(self: ScrollBoxListMixin): boolean
-            ---@field public FullUpdateInternal fun(self: ScrollBoxListMixin)
-            ---@field public ScrollToNearest fun(self: ScrollBoxListMixin, dataIndex: number, noInterpolation?: boolean): number
-            ---@field public ScrollToElementDataIndex fun(self: ScrollBoxListMixin, dataIndex: number, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
-            ---@field public ScrollToElementData fun(self: ScrollBoxListMixin, elementData: ScrollBoxElementData, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
-            ---@field public ScrollToElementDataByPredicate fun(self: ScrollBoxListMixin, predicate: ScrollBoxPredicateFunction, alignment?: ScrollBoxViewAlignment, noInterpolation?: boolean)
-
-            ---@class WowScrollBoxList : ScrollBoxListMixin, Frame
-            ---@field public canInterpolateScroll boolean false
-            ---@field public ScrollTarget EventFrame
-            ---@field public Shadows Frame
-
-            ---@class CompactVendorFrameScrollBox : WowScrollBoxList
-
-            self.ScrollBox = CreateFrame("Frame", nil, self, "WowScrollBoxList") ---@class CompactVendorFrameScrollBox
-            self.ScrollBox:SetSize(466, 386)
-            self.ScrollBox:SetPoint("TOPLEFT", 7, -64)
-            self.ScrollBox:SetAllPoints()
-
-            ---@class EventFrame : Frame
-            ---@field public Event table<"OnHide"|"OnShow"|"OnSizeChanged", number>
-            ---@field public OnLoad_Intrinsic fun(self: EventFrame)
-            ---@field public OnHide_Intrinsic fun(self: EventFrame)
-            ---@field public OnShow_Intrinsic fun(self: EventFrame)
-            ---@field public OnSizeChanged_Intrinsic fun(self: EventFrame, width: number, height: number)
-
-            ---@class WowTrimScrollBar : Frame
-            ---@field public minThumbExtent number 23
-            ---@field public Backplate Texture
-            ---@field public Background Frame
-            ---@field public Track Frame
-            ---@field public Back Button
-            ---@field public Forward Button
-            ---@field public OnLoad fun(self: WowTrimScrollBar)
-
-            ---@class CompactVendorFrameScrollBar : EventFrame, WowTrimScrollBar
-
-            self.ScrollBar = CreateFrame("EventFrame", nil, self, "WowTrimScrollBar") ---@class CompactVendorFrameScrollBar
-            self.ScrollBar:SetPoint("TOPLEFT", self.ScrollBox, "TOPRIGHT", -1, 2)
-            self.ScrollBar:SetPoint("BOTTOMLEFT", self.ScrollBox, "BOTTOMRIGHT", -1, -3)
-
-            do
-
-                local view = CreateScrollBoxListLinearView() ---@type ViewPolyfill
-                view.templateInfos["CompactVendorFrameMerchantButtonTemplate"] = { type = "Button", width = 300, height = 24, keyValues = {} }
-                view:SetElementInitializer("CompactVendorFrameMerchantButtonTemplate", CreateMerchantItemButton)
-                view:SetPadding(2, 2, 2, 2, 0)
-                ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view)
-
-                self.ScrollBox:SetDataProvider(MerchantDataProvider)
-
-                local scrollPercentage
-
-                local function OnPreUpdate()
-                    if scrollPercentage then
-                        return
-                    end
-                    scrollPercentage = self.ScrollBox:CalculateScrollPercentage()
-                end
-
-                local function OnPostUpdate()
-                    if not scrollPercentage then
-                        return
-                    end
-                    self.ScrollBox:SetScrollPercentage(scrollPercentage)
-                    scrollPercentage = nil
-                end
-
-                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPreUpdate, OnPreUpdate)
-                MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, OnPostUpdate)
-
-            end
-
-        end
+        self:ModifyMerchantFrame()
+        self:CreateSearchBox()
+        self:CreateScrollBox()
 
     end
 
