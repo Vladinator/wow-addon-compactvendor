@@ -1415,9 +1415,9 @@ local MerchantScanner do
     ---@type WowEvent[]
     MerchantScanner.Events = {
         "MERCHANT_UPDATE",
-        -- "MERCHANT_FILTER_ITEM_UPDATE",
-        -- "HEIRLOOMS_UPDATED",
-        -- "GET_ITEM_INFO_RECEIVED",
+        "MERCHANT_FILTER_ITEM_UPDATE",
+        "HEIRLOOMS_UPDATED",
+        "GET_ITEM_INFO_RECEIVED",
         -- "ITEM_DATA_LOAD_RESULT",
     }
 
