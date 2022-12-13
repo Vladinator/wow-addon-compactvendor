@@ -38,7 +38,8 @@ local GetColorFromQuality
 local GetQualityFromLink
 local GetItemIDFromLink
 local GetInfoFromGUID
-local GetMoneyString do
+local GetMoneyString
+local ConvertToPattern do
 
     ---@class SimpleColor
     ---@field public r number
@@ -192,6 +193,28 @@ local GetMoneyString do
             moneyString = format("%s%s%s", moneyString, separator, copperString)
         end
         return moneyString
+    end
+
+    ---@param pattern string
+    function ConvertToPattern(pattern)
+        for i = 1, 20 do
+            pattern = pattern:gsub("%%" .. i .. "$s", "%%s")
+            pattern = pattern:gsub("%%" .. i .. "$d", "%%d")
+            pattern = pattern:gsub("%%" .. i .. "$f", "%%f")
+        end
+        pattern = pattern:gsub("%%", "%%%%")
+        pattern = pattern:gsub("%.", "%%%.")
+        pattern = pattern:gsub("%?", "%%%?")
+        pattern = pattern:gsub("%+", "%%%+")
+        pattern = pattern:gsub("%-", "%%%-")
+        pattern = pattern:gsub("%(", "%%%(")
+        pattern = pattern:gsub("%)", "%%%)")
+        pattern = pattern:gsub("%[", "%%%[")
+        pattern = pattern:gsub("%]", "%%%]")
+        pattern = pattern:gsub("%%%%s", "(.-)")
+        pattern = pattern:gsub("%%%%d", "(%%d+)")
+        pattern = pattern:gsub("%%%%%%[%d%.%,]+f", "([%%d%%.%%,]+)")
+        return pattern
     end
 
 end
@@ -348,8 +371,89 @@ local CreateTooltipItem do
         return self:GetName() == RETRIEVING_ITEM_INFO
     end
 
+    ---@enum ItemRequirementType
+    local ItemRequirementType = {
+        Profession = 1,
+        Level = 2,
+        Rating = 3,
+        Achievement = 4,
+        Guild = 5,
+        Reputation = 6,
+        Specialization = 7,
+    }
+
+    ---@class ItemRequirement : table
+    ---@field public raw string
+    ---@field public type ItemRequirementType
+    ---@field public requires? string
+    ---@field public amount? number
+    ---@field public level? number
+    ---@field public rating? string
+    ---@field public achievement? string
+    ---@field public guild? string
+    ---@field public reputation? string
+    ---@field public rank? number
+    ---@field public specialization? string
+
+    local ItemRequirementFieldCount = 2
+
+    local ItemRequirements = {
+        { ITEM_MIN_SKILL, ItemRequirementType.Profession, "requires", "amount" },
+        { ITEM_REQ_SKILL, ItemRequirementType.Profession, "requires" },
+        { ITEM_MIN_LEVEL, ItemRequirementType.Level, "level" },
+        { ITEM_REQ_ARENA_RATING, ItemRequirementType.Rating, "rating" },
+        { ITEM_REQ_PURCHASE_ACHIEVEMENT, ItemRequirementType.Achievement, "achievement" },
+        { ITEM_REQ_PURCHASE_GUILD, ItemRequirementType.Guild, "guild" },
+        { ITEM_REQ_PURCHASE_GUILD_LEVEL, ItemRequirementType.Guild, "guild", "level" },
+        { ITEM_REQ_REPUTATION, ItemRequirementType.Reputation, "reputation", "rank" },
+        { ITEM_REQ_SPECIALIZATION, ItemRequirementType.Specialization, "specialization" },
+    }
+
+    for _, requirement in ipairs(ItemRequirements) do
+        requirement[1] = format("^%s$", ConvertToPattern(requirement[1]))
+    end
+
+    ---@param text string
+    ---@return ItemRequirement? itemRequirement
+    local function GetItemRequirement(text)
+        for _, requirement in ipairs(ItemRequirements) do
+            local pattern = requirement[1]
+            local requirementType = requirement[2]
+            local count = #requirement - ItemRequirementFieldCount
+            local temp = {text:match(pattern)}
+            if temp[count] then
+                for i = 1, count do
+                    local key = requirement[i + ItemRequirementFieldCount]
+                    temp[key] = temp[i]
+                end
+                temp.raw = text
+                temp.type = requirementType
+                return temp
+            end
+        end
+    end
+
+    ---@param color TooltipSimpleColor
+    local function ColorIsRed(color)
+        local r, g, b = floor(color.r*255), floor(color.g*255), floor(color.b*255)
+        return r > 250 and g < 40 and b < 40 -- 255 32 32
+    end
+
+    ---@return boolean? canLearn, ItemRequirement? itemRequirement
     function TooltipItem:CanLearn()
         for _, line in ipairs(self.tooltipData.lines) do
+            if line:IsTypeText() then
+                local text = line:GetLeftText()
+                local itemRequirement = GetItemRequirement(text)
+                if itemRequirement then
+                    local color = line:GetLeftColor()
+                    local canLearn = true
+                    if color then
+                        canLearn = not ColorIsRed(color)
+                    end
+                    return canLearn, itemRequirement
+                end
+            end
         end
     end
 
@@ -688,6 +792,7 @@ local UpdateMerchantItemButton do
     ---@field public maxStackCount? number
     ---@field public tooltipData? TooltipItem
     ---@field public canLearn? boolean
+    ---@field public canLearnRequirement? ItemRequirement
 
     local MerchantItem = {} ---@class MerchantItem
 
@@ -729,6 +834,8 @@ local UpdateMerchantItemButton do
         end
         ResetTableContents(self)
         self.qualityColor = nil
+        self.tooltipData = nil
+        self.canLearnRequirement = nil
     end
 
     -- If dirty it means the index is not defined or the item has pending data.
@@ -847,8 +954,9 @@ local UpdateMerchantItemButton do
             if not tooltipData then
                 return
             end
-            if self.canLearn == nil then
-                self.canLearn = tooltipData:CanLearn()
+            if self.canLearn == nil and self:IsLearnable() then
+                self.canLearn,
+                self.canLearnRequirement = tooltipData:CanLearn()
             end
         end
         if tooltipData then
@@ -946,6 +1054,21 @@ local UpdateMerchantItemButton do
         return true
     end
 
+    function MerchantItem:IsLearnable()
+        local itemClassID = self.itemClassID
+        if itemClassID == Enum.ItemClass.Recipe then
+            return true
+        elseif itemClassID == Enum.ItemClass.Glyph then
+            return true
+        elseif itemClassID == Enum.ItemClass.Miscellaneous then
+            local itemSubClassID = self.itemSubClassID
+            return itemSubClassID == Enum.ItemMiscellaneousSubclass.Mount
+                or itemSubClassID == Enum.ItemMiscellaneousSubclass.CompanionPet
+                or itemSubClassID == Enum.ItemMiscellaneousSubclass.Junk
+        end
+        return false
+    end
+
     ---@param parent MerchantScanner
     ---@param index number
     ---@return MerchantItem itemData
@@ -959,7 +1082,7 @@ local UpdateMerchantItemButton do
     local function GetTextForItem(merchantItem)
         return format(
             "%s%s%s",
-            merchantItem.numAvailable and merchantItem.numAvailable > -1 and format("|cffFFFF00[%d]|r", merchantItem.numAvailable) or "",
+            merchantItem.numAvailable and merchantItem.numAvailable > -1 and format("|cffFFFF00[%d]|r ", merchantItem.numAvailable) or "",
             merchantItem.name or SEARCH_LOADING_TEXT,
             merchantItem.stackCount and merchantItem.stackCount > 1 and format(" |cffFFFF00x%d|r", merchantItem.stackCount) or ""
         )
@@ -984,11 +1107,16 @@ local UpdateMerchantItemButton do
         local isUsable = merchantItem.isUsable
         local canAfford = merchantItem.canAfford
         local canLearn = merchantItem.canLearn
+        local canLearnRequirement = merchantItem.canLearnRequirement
         if not isPurchasable or not isUsable or not canAfford then
             backgroundColor = BackgroundColorPreset.Red
         end
-        if canLearn then
-            -- TODO
+        if canLearn and canLearnRequirement and canLearnRequirement.type == 1 then -- Profession
+            if canLearnRequirement.amount then
+                backgroundColor = BackgroundColorPreset.Yellow
+            else
+                backgroundColor = BackgroundColorPreset.Orange
+            end
         end
         if backgroundColor then
             button:SetBackgroundColor(backgroundColor)
@@ -1337,8 +1465,12 @@ local MerchantDataProvider do
 
     ---@alias MerchantItemProviderEvent DataProviderEvent|MerchantScannerEvent|"OnPreUpdate"|"OnPostUpdate"
 
+    ---The return value can be `true` (hide), `false` (show) or `nil` to indicate that the filter is irrelevant.
+    ---@alias MerchantItemProviderFilter fun(itemData: MerchantItem): boolean?
+
     ---@class MerchantDataProvider : DataProvider
     ---@field public Event table<MerchantItemProviderEvent, number>
+    ---@field public filters table<MerchantItemProviderFilter, boolean?>
     ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: MerchantItemProviderEvent[])
 
     MerchantDataProvider = CreateDataProvider() ---@type MerchantDataProvider
@@ -1352,12 +1484,49 @@ local MerchantDataProvider do
         "OnReady",
     })
 
-    ---@param isReady boolean
-    function MerchantDataProvider:Refresh(isReady)
+    MerchantDataProvider.filters = {}
+
+    ---@param filter MerchantItemProviderFilter
+    function MerchantDataProvider:AddFilter(filter)
+        self.filters[filter] = true
+    end
+
+    ---@param filter MerchantItemProviderFilter
+    function MerchantDataProvider:RemoveFilter(filter)
+        self.filters[filter] = nil
+    end
+
+    ---@param items MerchantItem[]
+    ---@return MerchantItem[] filteredItems, boolean allDisplayed
+    function MerchantDataProvider:ApplyFilters(items)
+        local filteredItems = {} ---@type MerchantItem[]
+        local index = 0
+        local allDisplayed = true
+        for _, itemData in ipairs(items) do
+            local filtered = false
+            for filter, _ in pairs(self.filters) do
+                if filter(itemData) == false then
+                    filtered = true
+                    break
+                end
+            end
+            if filtered then
+                allDisplayed = false
+            else
+                index = index + 1
+                filteredItems[index] = itemData
+            end
+        end
+        return filteredItems, allDisplayed
+    end
+
+    function MerchantDataProvider:Refresh()
+        local isReady = MerchantScanner.isReady
         local items = MerchantScanner:GetMerchantItems()
+        local filteredItems = self:ApplyFilters(items)
         self:TriggerEvent(self.Event.OnPreUpdate, isReady)
         self:Flush()
-        self:InsertTable(items)
+        self:InsertTable(filteredItems)
         self:TriggerEvent(self.Event.OnUpdate, isReady)
         self:TriggerEvent(self.Event.OnPostUpdate, isReady)
     end
@@ -1376,11 +1545,11 @@ local MerchantDataProvider do
         if isReady ~= true then
             return
         end
-        MerchantDataProvider:Refresh(isReady)
+        MerchantDataProvider:Refresh()
     end
 
     local function OnReady()
-        MerchantDataProvider:Refresh(true)
+        MerchantDataProvider:Refresh()
     end
 
     MerchantScanner:RegisterCallback(MerchantScanner.Event.OnShow, OnShow)
@@ -1436,6 +1605,32 @@ local Frame do
 
     function Frame:CreateSearchBox()
 
+        ---@type string?
+        local searchText
+
+        ---@param text? string
+        local function SetSearchText(text)
+            if not text or type(text) ~= "string" then
+                text = ""
+            end
+            text = text:lower()
+            text = text:trim() ---@diagnostic disable-line: undefined-field
+            searchText = text
+            MerchantDataProvider:Refresh()
+        end
+
+        MerchantDataProvider:AddFilter(function(itemData)
+            if not searchText or searchText == "" then
+                return
+            end
+            local name = itemData.name
+            if not name then
+                return
+            end
+            local index = name:lower():find(searchText, nil, true)
+            return index ~= nil
+        end)
+
         ---@class CompactVendorFrameSearchBox : EditBox
         ---@field public clearButton Button
 
@@ -1463,6 +1658,7 @@ local Frame do
 
         function self.Search:OnTextChanged()
             SearchBoxTemplate_OnTextChanged(self)
+            SetSearchText(self:GetText())
         end
 
         function self.Search:OnChar()
@@ -1717,7 +1913,7 @@ local Frame do
         -- the hover animation works, quantity button works, but the icon isn't being updated (OnUpdate might be disabled?) and this is fixed if we
         -- manually refresh the data provider one more time... but why?
 
-        hooksecurefunc("MerchantFrame_UpdateMerchantInfo", function() C_Timer.After(0.25, function() MerchantDataProvider:Refresh(true) end) end)
+        hooksecurefunc("MerchantFrame_UpdateMerchantInfo", function() C_Timer.After(0.25, function() MerchantDataProvider:Refresh() end) end)
 
     end
 
@@ -2023,11 +2219,11 @@ local CompactVendorFrameMerchantButtonQuantityTemplate do
     end
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnShow()
-        -- start watching for scroll events and move the StackSplitFrame accordingly and track the correct StackSplitFrameOwnedBy for when we perform a purchase
+        self.StackSplitFrame:Hide()
     end
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnHide()
-        -- stop watching for scroll events and move the StackSplitFrame accordingly and track the correct StackSplitFrameOwnedBy for when we perform a purchase
+        self.StackSplitFrame:Hide()
     end
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnClick()
