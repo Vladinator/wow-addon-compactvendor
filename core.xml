@@ -7,7 +7,7 @@
         <Color r="1.0" g="1.0" b="1.0" />
     </Font>
 
-    <Font name="CompactVendorFrameFont2" inherits="SystemFont_Shadow_Med2" virtual="true">
+    <Font name="CompactVendorFrameFont2" inherits="SystemFont_Shadow_Med1" virtual="true">
         <Color r="1.0" g="1.0" b="1.0" />
     </Font>
 
@@ -25,7 +25,7 @@
                         <Anchor point="RIGHT" x="-50" y="18" />
                     </Anchors>
                 </FontString>
-                <FontString parentKey="StackItemCountText" inherits="GameFontNormal" hidden="true">
+                <FontString parentKey="StackItemCountText" inherits="CompactVendorFrameFont1" hidden="true">
                     <Anchors>
                         <Anchor point="BOTTOM" relativeKey="$parent.StackSplitText" x="0" y="-25" />
                     </Anchors>
@@ -127,7 +127,7 @@
 		<Size x="24" y="24" />
 		<Layers>
 			<Layer level="OVERLAY">
-				<FontString parentKey="Name" inherits="CompactVendorFrameFont1" justifyH="RIGHT" wordwrap="false">
+				<FontString parentKey="Name" inherits="CompactVendorFrameFont2" justifyH="RIGHT" wordwrap="false">
 					<Anchors>
 						<Anchor point="RIGHT" relativeKey="$parent" relativePoint="RIGHT" x="-1" y="0" />
 					</Anchors>
@@ -160,7 +160,7 @@
 						</MaskTexture>
 					</Layer>
 					<Layer level="OVERLAY">
-						<FontString parentKey="Count" inherits="CompactVendorFrameFont1" justifyH="RIGHT" justifyV="BOTTOM" wordwrap="false">
+						<FontString parentKey="Count" inherits="CompactVendorFrameFont2" justifyH="RIGHT" justifyV="BOTTOM" wordwrap="false">
 							<Anchors>
 								<Anchor point="BOTTOMRIGHT" />
 							</Anchors>

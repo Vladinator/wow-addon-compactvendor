@@ -1712,20 +1712,12 @@ local Frame do
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPreUpdate, OnPreUpdate)
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, OnPostUpdate)
 
-        -- TODO: the OnPostUpdateFirstShowHotfix is a bandaid fix that only resolves odd behavior when the frame is shown for the first time
+        -- TODO: the code below is a bandaid fix that only resolves odd behavior when the frame is shown for the first time
         -- and the events fire as they should, but once the UI is drawn and ready, the buttons themselves behave like they aren't interractable, but
         -- the hover animation works, quantity button works, but the icon isn't being updated (OnUpdate might be disabled?) and this is fixed if we
         -- manually refresh the data provider one more time... but why?
 
-        local function OnPostUpdateFirstShowHotfix()
-            if not self.isFirstShow then
-                return
-            end
-            self.isFirstShow = false
-            C_Timer.After(0.05, function() MerchantDataProvider:Refresh(true) end)
-        end
-
-        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, OnPostUpdateFirstShowHotfix)
+        hooksecurefunc("MerchantFrame_UpdateMerchantInfo", function() C_Timer.After(0.25, function() MerchantDataProvider:Refresh(true) end) end)
 
     end
 
@@ -1737,6 +1729,7 @@ local Frame do
         self:SetPoint("BOTTOMRIGHT", MerchantFrameInset, "BOTTOMRIGHT", -20, 55)
 
         self:SetScript("OnShow", self.OnShow)
+        self:SetScript("OnHide", self.OnHide)
         self:SetScript("OnEvent", self.OnEvent)
         FrameUtil.RegisterFrameForEvents(self, self.Events)
 
@@ -1747,7 +1740,9 @@ local Frame do
     end
 
     function Frame:OnShow()
-        self.isFirstShow = true
+    end
+
+    function Frame:OnHide()
     end
 
     Frame:OnLoad()
