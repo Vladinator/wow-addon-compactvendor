@@ -368,7 +368,8 @@ local CreateTooltipItem do
     end
 
     function TooltipItem:IsPending()
-        return self:GetName() == RETRIEVING_ITEM_INFO
+        local name = self:GetName()
+        return not name or name == "" or name == " " or name == RETRIEVING_ITEM_INFO
     end
 
     ---@enum ItemRequirementType
@@ -558,9 +559,13 @@ local TooltipScanner do
     end
 
     ---@param raw string|number
-    local function GetHyperlink(raw)
+    function TooltipScanner:SanitizeHyperlink(raw)
+        if type(raw) == "string" then
+            local id = raw:match("item:(%d+)")
+            raw = id and tonumber(id) or raw
+        end
         if type(raw) == "number" then
-            return format("item:%d", raw)
+            return format("|cffffffff|Hitem:%d::::::::::::::::::|h[]|h|r", raw)
         end
         return raw
     end
@@ -571,7 +576,14 @@ local TooltipScanner do
     ---@param hideVendorPrice? boolean
     ---@return TooltipItem|boolean tooltipData, boolean isPending
     function TooltipScanner:ScanHyperlink(hyperlinkOrItemID, optionalArg1, optionalArg2, hideVendorPrice)
-        local hyperlink = GetHyperlink(hyperlinkOrItemID)
+        local hyperlink = self:SanitizeHyperlink(hyperlinkOrItemID)
+        if not hyperlink then
+            return false, false
+        end
+        local itemID = GetItemInfoInstant(hyperlink)
+        if not itemID then
+            return false, false
+        end
         local tooltipData = C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
         if not tooltipData then
             return false, false
@@ -662,14 +674,13 @@ local TooltipDataProvider do
     ---@param itemData TooltipItem
     function TooltipDataProvider:TriggerCallback(itemData)
         TriggerCallback(itemData, itemData.hyperlink)
-        TriggerCallback(itemData, itemData:GetID())
     end
 
     ---@param query TooltipDataProviderCallbackKey
     ---@return TooltipItem? itemData
     function TooltipDataProvider:GetHyperlink(query)
         local _, itemData = self:FindByPredicate(function(itemData)
-            return itemData.hyperlink == query or itemData:GetID() == query
+            return itemData.hyperlink == query
         end)
         return itemData
     end
@@ -682,7 +693,8 @@ local TooltipDataProvider do
         if type(callback) ~= "function" then
             callback = nil
         end
-        local itemData = self:GetHyperlink(query)
+        local hyperlink = TooltipScanner:SanitizeHyperlink(query)
+        local itemData = self:GetHyperlink(hyperlink)
         if itemData then
             if callback and not skipCallbackWhenInstant then
                 callback(itemData)
@@ -690,9 +702,9 @@ local TooltipDataProvider do
             return itemData
         end
         if callback then
-            self:RegisterCallback(query, callback)
+            self:RegisterCallback(hyperlink, callback)
         end
-        TooltipScanner:ScanHyperlink(query)
+        TooltipScanner:ScanHyperlink(hyperlink)
     end
 
     ---@param itemData TooltipItem
@@ -790,6 +802,8 @@ local UpdateMerchantItemButton do
     ---@field public itemClassID number
     ---@field public itemSubClassID number
     ---@field public maxStackCount? number
+    ---@field public isLearnable? boolean
+    ---@field public tooltipScannable? boolean
     ---@field public tooltipData? TooltipItem
     ---@field public canLearn? boolean
     ---@field public canLearnRequirement? ItemRequirement
@@ -874,6 +888,9 @@ local UpdateMerchantItemButton do
                 return true
             end
         end
+        if self.tooltipScannable and self.tooltipData == nil then
+            return true
+        end
         return false
     end
 
@@ -949,17 +966,22 @@ local UpdateMerchantItemButton do
         self.itemClassID,
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
+        self.isLearnable = self:IsLearnable()
+        self.tooltipScannable = self.isLearnable
+        if not self.tooltipScannable then
+            return
+        end
         local tooltipData = self.tooltipData
         local function ProcessTooltipData()
             if not tooltipData then
                 return
             end
-            if self.canLearn == nil and self:IsLearnable() then
+            if self.canLearn == nil and self.isLearnable then
                 self.canLearn,
                 self.canLearnRequirement = tooltipData:CanLearn()
             end
         end
-        if tooltipData then
+        if tooltipData ~= nil then
             ProcessTooltipData()
             return
         end
@@ -970,7 +992,7 @@ local UpdateMerchantItemButton do
             ProcessTooltipData()
         end
         tooltipData = TooltipDataProvider:ScanHyperlink(self.itemLinkOrID, HandleTooltipData, true)
-        if tooltipData then
+        if tooltipData ~= nil then
             HandleTooltipData(tooltipData)
         end
     end
