@@ -49,24 +49,29 @@ local ConvertToPattern do
 
     ItemQualityColorToHexColor = {} ---@type table<number, SimpleColor>
     ItemHexColorToQualityIndex = {} ---@type table<string, number>
+    ColorPreset = {} ---@type table<string, string|SimpleColor>
 
     for i = 0, 8 do
 
         local r, g, b, hex = GetItemQualityColor(i)
 
-        ItemQualityColorToHexColor[i] = {
+        ---@type SimpleColor
+        local color = {
             r = r,
             g = g,
             b = b,
             hex = hex,
         }
 
+        ItemQualityColorToHexColor[i] = color
         ItemHexColorToQualityIndex[hex] = i
+        ColorPreset[i] = color
+        ColorPreset[hex] = color
 
     end
 
     ItemHexColorToQualityIndex.None = ItemHexColorToQualityIndex[0]
-    ColorPreset = ItemHexColorToQualityIndex
+    ColorPreset.None = ColorPreset[0]
 
     BackgroundColorPreset = {}
 
@@ -559,6 +564,7 @@ local TooltipScanner do
     end
 
     ---@param raw string|number
+    ---@return string
     function TooltipScanner:SanitizeHyperlink(raw)
         if type(raw) == "string" then
             local id = raw:match("item:(%d+)")
@@ -618,10 +624,12 @@ local TooltipDataProvider do
     ---@alias TooltipDataProviderCallbackKey string|number
     ---@alias TooltipDataProviderCallbackValue table<TooltipDataProviderCallback, boolean?>
     ---@alias TooltipDataProviderCallbackTable table<TooltipDataProviderCallbackKey, TooltipDataProviderCallbackValue>
+    ---@alias TooltipDataProviderPendingTable table<TooltipDataProviderCallbackKey, boolean?>
 
     ---@class TooltipDataProvider : DataProvider
     ---@field public Event table<TooltipDataProviderEvent, number>
     ---@field public callbacks TooltipDataProviderCallbackTable
+    ---@field public pending TooltipDataProviderPendingTable
     ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: TooltipDataProviderEvent[])
     ---@field public Init fun(self: DataProvider, tbl?: TooltipItem[])
     ---@field public InsertInternal fun(self: DataProvider, itemData: TooltipItem, hasSortComparator: boolean)
@@ -643,6 +651,7 @@ local TooltipDataProvider do
     })
 
     TooltipDataProvider.callbacks = {}
+    TooltipDataProvider.pending = {}
 
     ---@param query TooltipDataProviderCallbackKey
     ---@param callback TooltipDataProviderCallback
@@ -676,6 +685,21 @@ local TooltipDataProvider do
         TriggerCallback(itemData, itemData.hyperlink)
     end
 
+    ---@param hyperlink string
+    function TooltipDataProvider:IsPending(hyperlink)
+        return self.pending[hyperlink] == true
+    end
+
+    ---@param hyperlink string
+    function TooltipDataProvider:SetPending(hyperlink)
+        self.pending[hyperlink] = true
+    end
+
+    ---@param hyperlink string
+    function TooltipDataProvider:ClearPending(hyperlink)
+        self.pending[hyperlink] = nil
+    end
+
     ---@param query TooltipDataProviderCallbackKey
     ---@return TooltipItem? itemData
     function TooltipDataProvider:GetHyperlink(query)
@@ -694,16 +718,23 @@ local TooltipDataProvider do
             callback = nil
         end
         local hyperlink = TooltipScanner:SanitizeHyperlink(query)
-        local itemData = self:GetHyperlink(hyperlink)
-        if itemData then
-            if callback and not skipCallbackWhenInstant then
-                callback(itemData)
+        local isPending = self:IsPending(hyperlink)
+        if not isPending then
+            local itemData = self:GetHyperlink(hyperlink)
+            if itemData then
+                if callback and not skipCallbackWhenInstant then
+                    callback(itemData)
+                end
+                return itemData
             end
-            return itemData
         end
         if callback then
             self:RegisterCallback(hyperlink, callback)
         end
+        if isPending then
+            return
+        end
+        self:SetPending(hyperlink)
         TooltipScanner:ScanHyperlink(hyperlink)
     end
 
@@ -712,8 +743,11 @@ local TooltipDataProvider do
         TooltipDataProvider:TriggerCallback(itemData)
         local oldItemData = TooltipDataProvider:GetHyperlink(itemData.hyperlink)
         if not oldItemData then
+            TooltipDataProvider:ClearPending(itemData.hyperlink)
             TooltipDataProvider:Insert(itemData)
             TooltipDataProvider:TriggerEvent(TooltipDataProvider.Event.OnItemAdded, itemData)
+        else
+            TooltipDataProvider:ClearPending(oldItemData.hyperlink)
         end
         TooltipDataProvider:TriggerEvent(TooltipDataProvider.Event.OnItemReady, oldItemData or itemData)
     end
@@ -832,8 +866,6 @@ local UpdateMerchantItemButton do
     local function ResetTableContents(tbl)
         for k, v in pairs(tbl) do
             if type(k) == "userdata" or type(v) == "function" then
-            elseif type(v) == "number" then
-                tbl[k] = 0
             elseif type(v) ~= "table" then
                 tbl[k] = nil
             end
@@ -850,6 +882,7 @@ local UpdateMerchantItemButton do
         self.qualityColor = nil
         self.tooltipData = nil
         self.canLearnRequirement = nil
+        self.extendedCostCount = 0
     end
 
     -- If dirty it means the index is not defined or the item has pending data.
@@ -953,7 +986,7 @@ local UpdateMerchantItemButton do
             self.quality = GetQualityFromLink(self.itemLink)
         end
         if self.quality then
-			self.qualityColor = GetColorFromQuality(self.quality)
+            self.qualityColor = GetColorFromQuality(self.quality)
         end
         if not self.itemLinkOrID then
             return
@@ -967,13 +1000,16 @@ local UpdateMerchantItemButton do
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
         self.isLearnable = self:IsLearnable()
-        self.tooltipScannable = self.isLearnable
+        self.tooltipScannable = self.isLearnable or true -- DEBUG
         if not self.tooltipScannable then
             return
         end
         local tooltipData = self.tooltipData
+        if tooltipData == true then
+            return
+        end
         local function ProcessTooltipData()
-            if not tooltipData then
+            if not tooltipData or tooltipData == true then
                 return
             end
             if self.canLearn == nil and self.isLearnable then
@@ -1101,11 +1137,14 @@ local UpdateMerchantItemButton do
     end
 
     ---@param merchantItem MerchantItem
-    local function GetTextForItem(merchantItem)
+    ---@param color? SimpleColor
+    local function GetTextForItem(merchantItem, color)
         return format(
-            "%s%s%s",
+            "%s%s%s%s%s",
             merchantItem.numAvailable and merchantItem.numAvailable > -1 and format("|cffFFFF00[%d]|r ", merchantItem.numAvailable) or "",
+            color and format("|c%s", color.hex) or "",
             merchantItem.name or SEARCH_LOADING_TEXT,
+            color and "|r" or "",
             merchantItem.stackCount and merchantItem.stackCount > 1 and format(" |cffFFFF00x%d|r", merchantItem.stackCount) or ""
         )
     end
@@ -1119,8 +1158,8 @@ local UpdateMerchantItemButton do
         end
         local index = merchantItem:GetIndex()
         button:SetID(index)
-        button.Icon:SetTexture(merchantItem.texture)
-        local text = GetTextForItem(merchantItem)
+        button.Icon:SetItem(merchantItem)
+        local text = GetTextForItem(merchantItem, merchantItem.qualityColor or ColorPreset[0])
         button.Name:SetText(text)
         button.Cost:Update()
         local backgroundColor = BackgroundColorPreset.None
@@ -1970,7 +2009,10 @@ end
 ---@class CompactVendorFrameAutoSizeTemplate
 local CompactVendorFrameAutoSizeTemplate do
 
-    CompactVendorFrameAutoSizeTemplate = {} ---@class CompactVendorFrameAutoSizeTemplate : Frame
+    ---@class CompactVendorFrameAutoSizeTemplate : Frame
+    ---@field public isIconTextTemplate? boolean
+
+    CompactVendorFrameAutoSizeTemplate = {} ---@class CompactVendorFrameAutoSizeTemplate
     _G.CompactVendorFrameAutoSizeTemplate = CompactVendorFrameAutoSizeTemplate
 
     ---@param frames CompactVendorFrameAutoSizeTemplate[]
@@ -1987,7 +2029,17 @@ local CompactVendorFrameAutoSizeTemplate do
         self:SetWidth(1)
         AutoSize({ self:GetChildren() })
         local _, _, width = self:GetBoundsRect()
-        if width then self:SetWidth(width) end
+        if not width then
+            return
+        end
+        if self.isIconTextTemplate then
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            local cost = self ---@type CompactVendorFrameMerchantIconTemplate
+            if not cost.mode then
+                width = width - cost.Texture:GetWidth()
+            end
+        end
+        self:SetWidth(width)
     end
 
 end
@@ -2267,6 +2319,83 @@ local CompactVendorFrameMerchantButtonQuantityTemplate do
 
 end
 
+---@class CompactVendorFrameMerchantIconTemplate
+local CompactVendorFrameMerchantIconTemplate do
+
+    ---@class CompactVendorFrameMerchantIconTemplate : CompactVendorFrameAutoSizeTemplate
+    ---@field public Texture Texture
+    ---@field public TextureMask Texture #MaskTexture
+    ---@field public Border Texture
+    ---@field public BorderMask Texture #MaskTexture
+    ---@field public Count FontString
+    ---@field public Text FontString
+    ---@field public mode? boolean
+
+    CompactVendorFrameMerchantIconTemplate = {} ---@class CompactVendorFrameMerchantIconTemplate
+    _G.CompactVendorFrameMerchantIconTemplate = CompactVendorFrameMerchantIconTemplate
+
+    function CompactVendorFrameMerchantIconTemplate:OnLoad()
+        self.isIconTextTemplate = true
+    end
+
+    ---@param texture? string|number
+    function CompactVendorFrameMerchantIconTemplate:SetTexture(texture)
+        self.Texture:SetTexture(texture or 0)
+    end
+
+    ---@param quality? number|SimpleColor
+    function CompactVendorFrameMerchantIconTemplate:SetQuality(quality)
+        if type(quality) == "number" then
+            quality = ColorPreset[quality]
+        end
+        if type(quality) == "table" then
+            self.Border:SetVertexColor(quality.r, quality.g, quality.b, 1)
+        else
+            self.Border:SetVertexColor(1, 1, 1, 0)
+        end
+    end
+
+    ---@param count? number|string
+    function CompactVendorFrameMerchantIconTemplate:SetCount(count)
+        self.Count:SetText(count)
+    end
+
+    ---@param merchantItem MerchantItem
+    function CompactVendorFrameMerchantIconTemplate:SetItem(merchantItem)
+        local count = merchantItem.stackCount
+        self:SetTexture(merchantItem.texture)
+        self:SetQuality(merchantItem.qualityColor)
+        self:SetCount(count and count > 1 and count or "")
+        self:SetMode(true)
+    end
+
+    ---@param texture? number|string
+    ---@param quality? number|SimpleColor
+    ---@param count? number|string
+    function CompactVendorFrameMerchantIconTemplate:SetItemInfo(texture, quality, count)
+        self:SetTexture(texture)
+        self:SetQuality(quality)
+        self:SetCount(count)
+        self:SetMode(true)
+    end
+
+    ---@param text? string|number
+    function CompactVendorFrameMerchantIconTemplate:SetText(text)
+        self.Text:SetText(text or "")
+        self:SetMode(false)
+    end
+
+    ---@param asIcon boolean
+    function CompactVendorFrameMerchantIconTemplate:SetMode(asIcon)
+        self.mode = asIcon
+        self.Texture:SetShown(asIcon)
+        self.Border:SetShown(asIcon)
+        self.Count:SetShown(asIcon)
+        self.Text:SetShown(not asIcon)
+    end
+
+end
+
 ---@class CompactVendorFrameMerchantButtonCostButtonTemplate
 local CompactVendorFrameMerchantButtonCostButtonTemplate do
 
@@ -2304,19 +2433,12 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
 
     ---@alias CompactVendorFrameMerchantButtonCostButtonCostType "Item"|"Money"
 
-    ---@class CompactVendorFrameMerchantButtonCostButtonTemplateIcon : Frame, CompactVendorFrameAutoSizeTemplate
-    ---@field public Texture Texture
-    ---@field public Count FontString
-
     ---@class CompactVendorFrameMerchantButtonCostButtonTemplate : Button, CompactVendorFrameAutoSizeTemplate
     ---@field public parent CompactVendorFrameMerchantButtonCostTemplate
     ---@field public costType? CompactVendorFrameMerchantButtonCostButtonCostType
     ---@field public link? string
     ---@field public price? number
-    ---@field public Name FontString
-    ---@field public Icon CompactVendorFrameMerchantButtonCostButtonTemplateIcon
-    ---@field public CircleMask Texture MaskTexture
-    ---@field public Count FontString
+    ---@field public Icon CompactVendorFrameMerchantIconTemplate
 
     CompactVendorFrameMerchantButtonCostButtonTemplate = {} ---@class CompactVendorFrameMerchantButtonCostButtonTemplate
     _G.CompactVendorFrameMerchantButtonCostButtonTemplate = CompactVendorFrameMerchantButtonCostButtonTemplate
@@ -2367,10 +2489,7 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
     function CompactVendorFrameMerchantButtonCostButtonTemplate:Reset()
         self:Hide()
         self:SetWidth(16)
-        self.Name:SetText()
-        self.Icon:Hide()
-        self.Icon.Texture:SetTexture(0)
-        self.Icon.Count:SetText()
+        self.Icon:SetText()
     end
 
     ---@param costType CompactVendorFrameMerchantButtonCostButtonCostType
@@ -2379,27 +2498,26 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
     ---@param texture? number|string
     ---@param price? number
     ---@param link? string
+    ---@param quality? number
     ---@param name? string
-    function CompactVendorFrameMerchantButtonCostButtonTemplate:Update(costType, canAfford, text, texture, price, link, name)
+    function CompactVendorFrameMerchantButtonCostButtonTemplate:Update(costType, canAfford, text, texture, price, link, quality, name)
         self:Reset()
+        if costType == "Item" then
+            self.Icon:SetItemInfo(texture, quality, text)
+        elseif costType == "Money" then
+            self.Icon:SetText(text)
+        end
         if canAfford then
             self.Icon.Texture:SetVertexColor(1, 1, 1)
         else
             self.Icon.Texture:SetVertexColor(1, 0, 0)
-        end
-        if costType == "Item" then
-            self.Icon.Count:SetText(text)
-            self.Icon.Texture:SetTexture(texture or 0)
-            self.Icon:Show()
-        elseif costType == "Money" then
-            self.Name:SetText(text)
         end
         self.costType = costType
         self.link = link
         self.price = price
         self:Show()
         if costType == "Money" then
-            self:SetWidth(max(16, self.Name:GetStringWidth() + (text:find("GoldIcon") and 6 or 0) + (text:find("SilverIcon") and 6 or 0) + (text:find("CopperIcon") and 6 or 0)))
+            self:SetWidth(max(16, self.Icon.Text:GetStringWidth() + (text:find("GoldIcon") and 6 or 0) + (text:find("SilverIcon") and 6 or 0) + (text:find("CopperIcon") and 6 or 0)))
         end
     end
 
@@ -2422,7 +2540,7 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
                     local itemNumAvailable = CountAvailableItems(costItem.itemLink)
                     local canAfford = itemNumAvailable - costItem.count >= 0
                     local text = costItem.count > 1 and costItem.count or "" -- FormatLargeNumber(costItem.count)
-                    cost:Update(costType, canAfford, text, costItem.texture, costItem.count, costItem.itemLink, costItem.name)
+                    cost:Update(costType, canAfford, text, costItem.texture, costItem.count, costItem.itemLink, costItem.quality,costItem.name)
                 else
                     return false
                 end
@@ -2538,8 +2656,7 @@ local CompactVendorFrameMerchantButtonCostTemplate do
         for i = #self.Costs, 1, -1 do
             index = index + 1
             local cost = self.Costs[i]
-            cost.Name:SetText()
-            cost.Icon:Hide()
+            cost.Icon:SetText()
             cost:Hide()
             pool[index] = cost
         end
@@ -2557,9 +2674,8 @@ local CompactVendorFrameMerchantButtonTemplate do
     ---@field public textColor? SimpleColor
     ---@field public hovering? boolean
     ---@field public Bg Texture
-    ---@field public Icon Texture
-    ---@field public CircleMask Texture MaskTexture
     ---@field public Name FontString
+    ---@field public Icon CompactVendorFrameMerchantIconTemplate
     ---@field public Quantity CompactVendorFrameMerchantButtonQuantityTemplate
     ---@field public Cost CompactVendorFrameMerchantButtonCostTemplate
 
