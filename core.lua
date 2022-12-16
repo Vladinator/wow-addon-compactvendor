@@ -224,7 +224,8 @@ local ConvertToPattern do
 
 end
 
-local CreateTooltipItem do
+local CreateTooltipItem
+local IsTooltipTextPending do
 
     ---@class TooltipItem
     ---@field public tooltipData TooltipDataArgs
@@ -372,9 +373,15 @@ local CreateTooltipItem do
         return self.tooltipData.lines[1].leftText
     end
 
+    ---@param text any
+    ---@return boolean isPending
+    function IsTooltipTextPending(text)
+        return not text or text == "" or text == " " or text == RETRIEVING_ITEM_INFO
+    end
+
     function TooltipItem:IsPending()
         local name = self:GetName()
-        return not name or name == "" or name == " " or name == RETRIEVING_ITEM_INFO
+        return IsTooltipTextPending(name)
     end
 
     ---@enum ItemRequirementType
@@ -504,13 +511,28 @@ local TooltipScanner do
 
     TooltipScanner.collection = {}
 
+    ---@param rawData TooltipData
+    ---@return boolean? isPending
+    local function IsPending(rawData)
+        local args = rawData.lines[1].args
+        for _, arg in ipairs(args) do
+            if arg.field == "leftText" then
+                return IsTooltipTextPending(arg.stringVal)
+            end
+        end
+    end
+
     ---@param itemData TooltipItem
+    ---@return TooltipItem? itemData, boolean isPending
     function TooltipScanner:Refresh(itemData)
         local hyperlink, optionalArg1, optionalArg2, hideVendorPrice = itemData:GetCallArgs()
         local tooltipData = C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+        if IsPending(tooltipData) then
+            return nil, true
+        end
         local newItemData = self:ConvertToTooltipItem(tooltipData, hyperlink)
         Mixin(itemData, newItemData)
-        return itemData, itemData:IsPending()
+        return itemData, false
     end
 
     ---@param itemData TooltipItem
@@ -525,10 +547,11 @@ local TooltipScanner do
         local collection = self.collection
         for i = #collection, 1, -1 do
             local itemData = collection[i]
-            if itemData:IsPending() then
-                self:Refresh(itemData)
+            local isPending = itemData:IsPending()
+            if isPending then
+                itemData, isPending = self:Refresh(itemData) ---@diagnostic disable-line: cast-local-type
             end
-            if not itemData:IsPending() then
+            if not isPending then
                 table.remove(collection, i)
                 self:TriggerEvent(self.Event.OnItemReady, itemData)
             end
@@ -1420,8 +1443,12 @@ local MerchantScanner do
 
     ---@param itemID number
     ---@param checkCostItems? boolean
-    function MerchantScanner:UpdateMerchantItemByID(itemID, checkCostItems)
+    ---@param includePending? boolean
+    function MerchantScanner:UpdateMerchantItemByID(itemID, checkCostItems, includePending)
         self:UpdateMerchant(false, function(itemData)
+            if (not includePending) and (not itemData:IsPending()) then
+                return false
+            end
             if itemData.merchantItemID == itemID then
                 return true
             elseif checkCostItems then
@@ -1433,6 +1460,27 @@ local MerchantScanner do
                 end
             end
             return false
+        end)
+    end
+
+    local throttleHandle
+
+    local function throttleHandleClear()
+        if not throttleHandle then
+            return
+        end
+        throttleHandle:Cancel()
+        throttleHandle = nil
+    end
+
+    ---@param itemID number
+    ---@param checkCostItems? boolean
+    ---@param includePending? boolean
+    function MerchantScanner:UpdateMerchantItemByIDThrottled(itemID, checkCostItems, includePending)
+        throttleHandleClear()
+        throttleHandle = C_Timer.NewTicker(0.25, function()
+            self:UpdateMerchantItemByID(itemID, checkCostItems, includePending)
+            throttleHandleClear()
         end)
     end
 
@@ -1479,7 +1527,7 @@ local MerchantScanner do
         "MERCHANT_FILTER_ITEM_UPDATE",
         "HEIRLOOMS_UPDATED",
         "GET_ITEM_INFO_RECEIVED",
-        -- "ITEM_DATA_LOAD_RESULT",
+        "ITEM_DATA_LOAD_RESULT",
     }
 
     ---@param event WowEvent
@@ -1509,7 +1557,7 @@ local MerchantScanner do
         elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
             local itemID, success = ...
             if success then
-                MerchantScanner:UpdateMerchantItemByID(itemID, true)
+                MerchantScanner:UpdateMerchantItemByIDThrottled(itemID, true, true)
             end
         end
     end
