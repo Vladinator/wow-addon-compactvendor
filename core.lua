@@ -27,6 +27,14 @@ local MerchantNextPageButton = MerchantNextPageButton ---@type Button
 local MerchantPageText = MerchantPageText ---@type FontString
 local MerchantPrevPageButton = MerchantPrevPageButton ---@type Button
 
+---@class ItemSearch-1.3
+---@field private Unusable table<number, boolean?>
+---@field private Bangs table<number, boolean?>
+---@field public Matches fun(self: ItemSearch-1.3, item: table|string|number, search: string): boolean?
+---@field public IsUnusable fun(self: ItemSearch-1.3, id: number): isUnusable: boolean
+---@field public IsQuestItem fun(self: ItemSearch-1.3, id: number): isQuestItem: boolean, isBang: boolean?
+local LibItemSearch = LibStub("ItemSearch-1.3", true)
+
 local addonName, ---@type string CompactVendor
     ns = ... ---@class CompactVendorNS
 
@@ -875,6 +883,7 @@ local UpdateMerchantItemButton do
 
     ---@class MerchantItem
     ---@field public parent MerchantScanner
+    ---@field public index number
     ---@field public name? string
     ---@field public texture number|string
     ---@field public price number
@@ -1801,6 +1810,9 @@ local Frame do
             local name = itemData.name
             if not name then
                 return
+            end
+            if LibItemSearch then
+                return LibItemSearch:Matches(itemData.itemLinkOrID, searchText) == true
             end
             local index = name:lower():find(searchText, nil, true)
             return index ~= nil
@@ -2954,4 +2966,4 @@ local CompactVendorFrameMerchantButtonTemplate do
 
 end
 
-MerchantDataProvider:AddFilter(function(itemData) if GetMerchantFilter() == 1 then return end return itemData.isLearned ~= true and itemData.isCollected ~= true end) -- DEBUG: hide all known items and collected pets (unless we're showing all items)
+-- MerchantDataProvider:AddFilter(function(itemData) if GetMerchantFilter() == 1 then return end return itemData.isLearned ~= true and itemData.isCollected ~= true end) -- DEBUG: hide all known items and collected pets (unless we're showing all items)
