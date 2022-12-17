@@ -49,7 +49,7 @@ local ConvertToPattern do
 
     ItemQualityColorToHexColor = {} ---@type table<number, SimpleColor>
     ItemHexColorToQualityIndex = {} ---@type table<string, number>
-    ColorPreset = {} ---@type table<string, string|SimpleColor>
+    ColorPreset = {} ---@type table<string|number, string|SimpleColor>
 
     for i = 0, 8 do
 
@@ -72,6 +72,14 @@ local ConvertToPattern do
 
     ItemHexColorToQualityIndex.None = ItemHexColorToQualityIndex[0]
     ColorPreset.None = ColorPreset[0]
+    ColorPreset.Gray = ColorPreset[0]
+    ColorPreset.White = ColorPreset[1]
+    ColorPreset.Green = ColorPreset[2]
+    ColorPreset.Blue = ColorPreset[3]
+    ColorPreset.Purple = ColorPreset[4]
+    ColorPreset.Legendary = ColorPreset[5]
+    ColorPreset.Artifact = ColorPreset[6]
+    ColorPreset.Heirloom = ColorPreset[7]
 
     BackgroundColorPreset = {}
 
@@ -465,6 +473,45 @@ local IsTooltipTextPending do
                         canLearn = not ColorIsRed(color)
                     end
                     return canLearn, itemRequirement
+                end
+            end
+        end
+    end
+
+    ---@return boolean? isLearned
+    function TooltipItem:IsLearned()
+        for _, line in ipairs(self.tooltipData.lines) do
+            if line:IsTypeText() then
+                local text = line:GetLeftText()
+                if text == ITEM_SPELL_KNOWN then
+                    local color = line:GetLeftColor()
+                    return ColorIsRed(color)
+                end
+            end
+        end
+    end
+
+    local ITEM_PET_KNOWN_PATTERN = format("^%s$", ConvertToPattern(ITEM_PET_KNOWN))
+
+    ---@param text string
+    ---@return number? numCollected, number? numCollectable
+    local function GetItemCollected(text)
+        local numCollected, numCollectable = text:match(ITEM_PET_KNOWN_PATTERN)
+        if not numCollected then
+            return
+        end
+        return tonumber(numCollected), tonumber(numCollectable)
+    end
+
+    ---@return boolean? isCollected, number? numCollected, number? numCollectable
+    function TooltipItem:IsCollected()
+        for _, line in ipairs(self.tooltipData.lines) do
+            if line:IsTypeText() then
+                local text = line:GetLeftText()
+                local numCollected, numCollectable = GetItemCollected(text)
+                if numCollected then
+                    local isCollected = numCollected == numCollectable
+                    return isCollected, numCollected, numCollectable
                 end
             end
         end
@@ -864,6 +911,10 @@ local UpdateMerchantItemButton do
     ---@field public tooltipData? TooltipItem
     ---@field public canLearn? boolean
     ---@field public canLearnRequirement? ItemRequirement
+    ---@field public isLearned? boolean
+    ---@field public isCollected? boolean
+    ---@field public isCollectedNum? number
+    ---@field public isCollectedNumMax? number
 
     local MerchantItem = {} ---@class MerchantItem
 
@@ -1023,7 +1074,7 @@ local UpdateMerchantItemButton do
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
         self.isLearnable = self:IsLearnable()
-        self.tooltipScannable = self.isLearnable or true -- DEBUG
+        self.tooltipScannable = self.isLearnable or true -- DEBUG: performance check by scanning all the items
         if not self.tooltipScannable then
             return
         end
@@ -1035,9 +1086,19 @@ local UpdateMerchantItemButton do
             if not tooltipData or tooltipData == true then
                 return
             end
-            if self.canLearn == nil and self.isLearnable then
-                self.canLearn,
-                self.canLearnRequirement = tooltipData:CanLearn()
+            if self.isLearnable then
+                if self.canLearn == nil then
+                    self.canLearn,
+                    self.canLearnRequirement = tooltipData:CanLearn()
+                end
+                if self.isLearned == nil then
+                    self.isLearned = tooltipData:IsLearned()
+                end
+                if self.isCollected == nil then
+                    self.isCollected,
+                    self.isCollectedNum,
+                    self.isCollectedNumMax = tooltipData:IsCollected()
+                end
             end
         end
         if tooltipData ~= nil then
@@ -1146,6 +1207,7 @@ local UpdateMerchantItemButton do
             return itemSubClassID == Enum.ItemMiscellaneousSubclass.Mount
                 or itemSubClassID == Enum.ItemMiscellaneousSubclass.CompanionPet
                 or itemSubClassID == Enum.ItemMiscellaneousSubclass.Junk
+                or itemSubClassID == Enum.ItemMiscellaneousSubclass.Other
         end
         return false
     end
@@ -1160,14 +1222,11 @@ local UpdateMerchantItemButton do
     end
 
     ---@param merchantItem MerchantItem
-    ---@param color? SimpleColor
-    local function GetTextForItem(merchantItem, color)
+    local function GetTextForItem(merchantItem)
         return format(
-            "%s%s%s%s%s",
+            "%s%s%s",
             merchantItem.numAvailable and merchantItem.numAvailable > -1 and format("|cffFFFF00[%d]|r ", merchantItem.numAvailable) or "",
-            color and format("|c%s", color.hex) or "",
             merchantItem.name or SEARCH_LOADING_TEXT,
-            color and "|r" or "",
             merchantItem.stackCount and merchantItem.stackCount > 1 and format(" |cffFFFF00x%d|r", merchantItem.stackCount) or ""
         )
     end
@@ -1181,21 +1240,28 @@ local UpdateMerchantItemButton do
         end
         local index = merchantItem:GetIndex()
         button:SetID(index)
-        button.Icon:SetItem(merchantItem)
-        local text = GetTextForItem(merchantItem, merchantItem.qualityColor or ColorPreset[0])
+        button.Icon:SetItem(merchantItem, true)
+        local text = GetTextForItem(merchantItem)
         button.Name:SetText(text)
         button.Cost:Update()
         local backgroundColor = BackgroundColorPreset.None
-        local textColor = ColorPreset[max(1, merchantItem.quality or 0)] or ColorPreset.None
+        local textColor = merchantItem.qualityColor or ColorPreset.None
         local isPurchasable = not merchantItem.tintRed
         local isUsable = merchantItem.isUsable
         local canAfford = merchantItem.canAfford
         local canLearn = merchantItem.canLearn
         local canLearnRequirement = merchantItem.canLearnRequirement
+        local isLearned = merchantItem.isLearned
+        local isCollected = merchantItem.isCollected
+        local isCollectedNum = merchantItem.isCollectedNum
+        local isCollectedNumMax = merchantItem.isCollectedNumMax
         if not isPurchasable or not isUsable or not canAfford then
             backgroundColor = BackgroundColorPreset.Red
         end
-        if canLearn and canLearnRequirement and canLearnRequirement.type == 1 then -- Profession
+        if isLearned or isCollected then
+            backgroundColor = BackgroundColorPreset.None
+            textColor = ColorPreset.Gray
+        elseif canLearnRequirement and canLearnRequirement.type == 1 then -- Profession
             if canLearnRequirement.amount then
                 backgroundColor = BackgroundColorPreset.Yellow
             else
@@ -2391,7 +2457,7 @@ local CompactVendorFrameMerchantIconTemplate do
         self.Texture:SetTexture(texture or 0)
     end
 
-    ---@param quality? number|SimpleColor
+    ---@param quality? number|SimpleColor|nil
     function CompactVendorFrameMerchantIconTemplate:SetQuality(quality)
         if type(quality) == "number" then
             quality = ColorPreset[quality]
@@ -2409,11 +2475,13 @@ local CompactVendorFrameMerchantIconTemplate do
     end
 
     ---@param merchantItem MerchantItem
-    function CompactVendorFrameMerchantIconTemplate:SetItem(merchantItem)
+    ---@param hideCount? boolean
+    ---@param hideQuality? boolean
+    function CompactVendorFrameMerchantIconTemplate:SetItem(merchantItem, hideCount, hideQuality)
         local count = merchantItem.stackCount
         self:SetTexture(merchantItem.texture)
-        self:SetQuality(merchantItem.qualityColor)
-        self:SetCount(count and count > 1 and count or "")
+        self:SetQuality(hideQuality ~= true and merchantItem.qualityColor or nil)
+        self:SetCount(hideCount ~= true and count and count > 1 and count or "")
         self:SetMode(true)
     end
 
@@ -2576,7 +2644,11 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
     function CompactVendorFrameMerchantButtonCostButtonTemplate:Set(merchantItem, costType, pool)
         local cost = self
         if costType == "Item" then
-            for i = 1, merchantItem.extendedCostCount do
+            local count = merchantItem.extendedCostCount
+            if count == 0 then
+                return
+            end
+            for i = 1, count do
                 local costItem = merchantItem.extendedCostItems[i]
                 if costItem.texture then
                     if i ~= 1 then
@@ -2881,3 +2953,5 @@ local CompactVendorFrameMerchantButtonTemplate do
     end
 
 end
+
+MerchantDataProvider:AddFilter(function(itemData) if GetMerchantFilter() == 1 then return end return itemData.isLearned ~= true and itemData.isCollected ~= true end) -- DEBUG: hide all known items and collected pets (unless we're showing all items)
