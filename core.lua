@@ -1704,9 +1704,13 @@ local MerchantDataProvider do
         return filteredItems, allDisplayed
     end
 
+    function MerchantDataProvider:GetMerchantItems()
+        return MerchantScanner:GetMerchantItems()
+    end
+
     function MerchantDataProvider:Refresh()
         local isReady = MerchantScanner.isReady
-        local items = MerchantScanner:GetMerchantItems()
+        local items = MerchantDataProvider:GetMerchantItems()
         local filteredItems = self:ApplyFilters(items)
         self:TriggerEvent(self.Event.OnPreUpdate, isReady)
         self:Flush()
@@ -2965,5 +2969,3 @@ local CompactVendorFrameMerchantButtonTemplate do
     end
 
 end
-
--- MerchantDataProvider:AddFilter(function(itemData) if GetMerchantFilter() == 1 then return end return itemData.isLearned ~= true and itemData.isCollected ~= true end) -- DEBUG: hide all known items and collected pets (unless we're showing all items)
