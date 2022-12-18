@@ -1649,7 +1649,7 @@ local MerchantDataProvider do
 
     ---@alias MerchantItemProviderEvent DataProviderEvent|MerchantScannerEvent|"OnPreUpdate"|"OnPostUpdate"
 
-    ---The return value can be `true` (hide), `false` (show) or `nil` to indicate that the filter is irrelevant.
+    ---The return value can be `true` (show), `false` (hide) or `nil` to indicate that the filter is irrelevant and can't be performed on the item.
     ---@alias MerchantItemProviderFilter fun(itemData: MerchantItem): boolean?
 
     ---@class MerchantDataProvider : DataProvider
@@ -1689,7 +1689,7 @@ local MerchantDataProvider do
         for _, itemData in ipairs(items) do
             local filtered = false
             for filter, _ in pairs(self.filters) do
-                if filter(itemData) == false then
+                if filter(itemData) == true then
                     filtered = true
                     break
                 end
@@ -1816,10 +1816,10 @@ local Frame do
                 return
             end
             if LibItemSearch then
-                return LibItemSearch:Matches(itemData.itemLinkOrID, searchText) == true
+                return LibItemSearch:Matches(itemData.itemLinkOrID, searchText) ~= true
             end
             local index = name:lower():find(searchText, nil, true)
-            return index ~= nil
+            return index == nil
         end)
 
         ---@class CompactVendorFrameSearchBox : EditBox
