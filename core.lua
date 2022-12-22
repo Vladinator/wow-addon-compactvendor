@@ -249,6 +249,7 @@ local IsTooltipTextPending do
     ---@field public optionalArg1? number
     ---@field public optionalArg2? number
     ---@field public hideVendorPrice? boolean
+    ---@field public lastCalled number
 
     ---@class TooltipSimpleColor
     ---@field public r number
@@ -360,11 +361,12 @@ local IsTooltipTextPending do
         self.optionalArg1 = optionalArg1
         self.optionalArg2 = optionalArg2
         self.hideVendorPrice = hideVendorPrice
+        self.lastCalled = GetTime()
     end
 
-    ---@return string hyperlink, number? optionalArg1, number? optionalArg2, boolean? hideVendorPrice
+    ---@return string hyperlink, number? optionalArg1, number? optionalArg2, boolean? hideVendorPrice, number lastCalled
     function TooltipItem:GetCallArgs()
-        return self.hyperlink, self.optionalArg1, self.optionalArg2, self.hideVendorPrice
+        return self.hyperlink, self.optionalArg1, self.optionalArg2, self.hideVendorPrice, self.lastCalled
     end
 
     function TooltipItem:GetTooltipData()
@@ -563,6 +565,7 @@ local TooltipScanner do
     })
 
     TooltipScanner.TOOLTIP_DATA_UPDATE = "TOOLTIP_DATA_UPDATE"
+    TooltipScanner.TOOLTIP_REFRESH_INTERVAL = 0.25
 
     TooltipScanner.collection = {}
 
@@ -580,13 +583,18 @@ local TooltipScanner do
     ---@param itemData TooltipItem
     ---@return TooltipItem? itemData, boolean isPending
     function TooltipScanner:Refresh(itemData)
-        local hyperlink, optionalArg1, optionalArg2, hideVendorPrice = itemData:GetCallArgs()
+        local hyperlink, optionalArg1, optionalArg2, hideVendorPrice, lastCalled = itemData:GetCallArgs()
+        local now = GetTime()
+        if now - lastCalled < self.TOOLTIP_REFRESH_INTERVAL then
+            return nil, true
+        end
         local tooltipData = C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
         if IsPending(tooltipData) then
             return nil, true
         end
         local newItemData = self:ConvertToTooltipItem(tooltipData, hyperlink)
         Mixin(itemData, newItemData)
+        itemData.lastCalled = now
         return itemData, false
     end
 
