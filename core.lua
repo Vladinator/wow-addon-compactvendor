@@ -569,6 +569,16 @@ local TooltipScanner do
 
     TooltipScanner.collection = {}
 
+    local throttleHandle
+
+    local function throttleHandleClear()
+        if not throttleHandle then
+            return
+        end
+        throttleHandle:Cancel()
+        throttleHandle = nil
+    end
+
     ---@param rawData TooltipData
     ---@return boolean? isPending
     local function IsPending(rawData)
@@ -581,12 +591,12 @@ local TooltipScanner do
     end
 
     ---@param itemData TooltipItem
-    ---@return TooltipItem? itemData, boolean isPending
+    ---@return TooltipItem? itemData, boolean isPending, boolean? isPendingThrottled
     function TooltipScanner:Refresh(itemData)
         local hyperlink, optionalArg1, optionalArg2, hideVendorPrice, lastCalled = itemData:GetCallArgs()
         local now = GetTime()
         if now - lastCalled < self.TOOLTIP_REFRESH_INTERVAL then
-            return nil, true
+            return nil, true, true
         end
         local tooltipData = C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
         if IsPending(tooltipData) then
@@ -608,11 +618,16 @@ local TooltipScanner do
     function TooltipScanner:UpdatePending()
         local isScanning = self:IsEventRegistered(self.TOOLTIP_DATA_UPDATE)
         local collection = self.collection
+        local hasPendingThrottled = false
         for i = #collection, 1, -1 do
             local itemData = collection[i]
             local isPending = itemData:IsPending()
+            local isPendingThrottled
             if isPending then
-                itemData, isPending = self:Refresh(itemData) ---@diagnostic disable-line: cast-local-type
+                itemData, isPending, isPendingThrottled = self:Refresh(itemData) ---@diagnostic disable-line: cast-local-type
+                if isPendingThrottled then
+                    hasPendingThrottled = true
+                end
             end
             if not isPending then
                 table.remove(collection, i)
@@ -631,6 +646,14 @@ local TooltipScanner do
             end
             self:UnregisterEvent(self.TOOLTIP_DATA_UPDATE)
         end
+        if not hasPendingThrottled then
+            return
+        end
+        throttleHandleClear()
+        throttleHandle = C_Timer.NewTicker(self.TOOLTIP_REFRESH_INTERVAL, function()
+            throttleHandleClear()
+            self:UpdatePending()
+        end)
     end
 
     ---@param tooltipData TooltipData
@@ -1384,6 +1407,8 @@ local MerchantScanner do
 
     MerchantScanner.collection = {}
 
+    MerchantScanner.ITEM_REFRESH_INTERVAL = 0.25
+
     ---@alias ObjectPoolObject any
     ---@alias ObjectPoolCreate fun(pool: ObjectPool): ObjectPoolObject
     ---@alias ObjectPoolReset fun(pool: ObjectPool, self: ObjectPoolObject)
@@ -1561,9 +1586,9 @@ local MerchantScanner do
     ---@param includePending? boolean
     function MerchantScanner:UpdateMerchantItemByIDThrottled(itemID, checkCostItems, includePending)
         throttleHandleClear()
-        throttleHandle = C_Timer.NewTicker(0.25, function()
-            self:UpdateMerchantItemByID(itemID, checkCostItems, includePending)
+        throttleHandle = C_Timer.NewTicker(self.ITEM_REFRESH_INTERVAL, function()
             throttleHandleClear()
+            self:UpdateMerchantItemByID(itemID, checkCostItems, includePending)
         end)
     end
 
