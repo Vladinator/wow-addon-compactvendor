@@ -38,6 +38,72 @@ local LibItemSearch = LibStub("ItemSearch-1.3", true)
 local addonName, ---@type string CompactVendor
     ns = ... ---@class CompactVendorNS
 
+local CompactVendorDBDefaults
+local ListItemScaleToFontObject
+local GetListItemScaleFontObject do
+
+    CompactVendorDBDefaults = {
+        ListItemScale = 12,
+    }
+
+    local ListItemScaleFallbackFontObject = "CompactVendorFrameFont1"
+    local ListItemScaleFallbackFontSize = 12
+
+    -- https://github.com/Gethe/wow-ui-source/blob/live/Interface/SharedXML/SharedFonts.xml
+    ListItemScaleToFontObject = {
+        { 8, "SystemFont_Tiny2" },
+        { 9, "SystemFont_Tiny" },
+        { 10, "SystemFont_Small" },
+        { 11, "SystemFont_Small2" },
+        { 12, "SystemFont_Med1" },
+        { 13, "SystemFont_Med2" },
+        { 14, "SystemFont_Med3" },
+        { 15, "System15Font" },
+        { 16, "SystemFont_Large" },
+        { 17, "Game17Font_Shadow" },
+        { 18, "SystemFont_Shadow_Large2" },
+        { 20, "SystemFont_Shadow_Huge1" },
+        { 22, "SystemFont22_Outline" },
+        { 24, "SystemFont_Huge2" },
+        { 25, "SystemFont_Shadow_Huge3" },
+        { 27, "SystemFont_Huge4" },
+        { 30, "Game30Font" },
+        { 32, "Game32Font_Shadow2" },
+        { 36, "SystemFont_WTF2" },
+        { 40, "Game40Font_Shadow2" },
+        { 46, "Game46Font_Shadow2" },
+        { 52, "Game52Font_Shadow2" },
+        { 58, "Game58Font_Shadow2" },
+        { 64, "SystemFont_World" },
+        { 69, "Game69Font_Shadow2" },
+        { 72, "Game72Font" },
+    }
+
+    ListItemScaleToFontObject.minSize = 8
+    ListItemScaleToFontObject.maxSize = 72
+
+    ---@return string fontObject, number fontSize, boolean isExactSize, number defaultFontSize
+    function GetListItemScaleFontObject()
+        local listItemScale = CompactVendorDB.ListItemScale
+        listItemScale = floor(listItemScale + 0.5)
+        if listItemScale < ListItemScaleToFontObject.minSize then
+            return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, false, ListItemScaleFallbackFontSize
+        elseif listItemScale == ListItemScaleFallbackFontSize then
+            return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, true, ListItemScaleFallbackFontSize
+        end
+        for _, font in ipairs(ListItemScaleToFontObject) do
+            local size, fontObject = font[1], font[2]
+            if size == listItemScale then
+                return fontObject, size, true, ListItemScaleFallbackFontSize
+            elseif size > listItemScale then
+                return fontObject, size, false, ListItemScaleFallbackFontSize
+            end
+        end
+        return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, false, ListItemScaleFallbackFontSize
+    end
+
+end
+
 local ItemQualityColorToHexColor
 local ItemHexColorToQualityIndex
 local ColorPreset
@@ -1798,6 +1864,7 @@ local Frame do
             local name = ... ---@type string
             if name == addonName then
                 self:UnregisterEvent(event)
+                self:OnLoaded()
             end
         end
     end
@@ -2141,6 +2208,51 @@ local Frame do
 
     end
 
+    function Frame:CreateSettings()
+
+        ---@alias SettingsTextContainerPolyfillGetDataFunc fun(self: SettingsControlTextContainerPolyfill): SettingsSliderOptionsPolyfill[]
+
+        ---@class SettingsPolyfill
+        ---@field public RegisterVerticalLayoutCategory fun(name: string): SettingsCategoryPolyfill
+        ---@field public RegisterProxySetting fun(category: SettingsCategoryPolyfill, variable: string, db: table, defaultValueType: type, name: string, defaultValue: any): SettingsProxySettingPolyfill
+        ---@field public CreateCheckBox fun(category: SettingsCategoryPolyfill, setting: SettingsProxySettingPolyfill, tooltip: string)
+        ---@field public CreateSliderOptions fun(minValue: number, maxValue: number, step: number): SettingsSliderOptionsPolyfill
+        ---@field public CreateSlider fun(category: SettingsCategoryPolyfill, setting: SettingsProxySettingPolyfill, options: SettingsSliderOptionsPolyfill, tooltip: string)
+        ---@field public CreateControlTextContainer fun(): SettingsControlTextContainerPolyfill
+        ---@field public CreateDropDown fun(category: SettingsCategoryPolyfill, setting: SettingsProxySettingPolyfill, GetOptions: SettingsTextContainerPolyfillGetDataFunc, tooltip: string)
+        ---@field public RegisterAddOnCategory fun(category: SettingsCategoryPolyfill)
+
+        ---@class SettingsCategoryPolyfill
+
+        ---@class SettingsProxySettingPolyfill
+
+        ---@class SettingsSliderOptionsPolyfill
+        ---@field public SetLabelFormatter fun(self: SettingsSliderOptionsPolyfill, labelFormatter: any)
+
+        ---@class SettingsControlTextContainerPolyfill
+        ---@field public Add fun(self: SettingsControlTextContainerPolyfill, index: number, label: string)
+        ---@field public GetData SettingsTextContainerPolyfillGetDataFunc
+
+        local Settings = Settings ---@type SettingsPolyfill
+
+        local category = Settings.RegisterVerticalLayoutCategory(addonName)
+
+        do
+            local name = "Merchant Item Size (px)"
+            local tooltip = "Specify the font text size used in the merchant item buttons."
+            local variable = "ListItemScale"
+            local defaultValue = CompactVendorDBDefaults[variable]
+            local minValue, maxValue, step = ListItemScaleToFontObject.minSize, ListItemScaleToFontObject.maxSize, 1
+            local setting = Settings.RegisterProxySetting(category, variable, CompactVendorDB, type(defaultValue), name, defaultValue)
+            local options = Settings.CreateSliderOptions(minValue, maxValue, step)
+            options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right)
+            Settings.CreateSlider(category, setting, options, tooltip)
+        end
+
+        Settings.RegisterAddOnCategory(category)
+
+    end
+
     function Frame:OnLoad()
 
         self:SetFrameStrata("HIGH")
@@ -2153,9 +2265,17 @@ local Frame do
         self:SetScript("OnEvent", self.OnEvent)
         FrameUtil.RegisterFrameForEvents(self, self.Events)
 
+    end
+
+    function Frame:OnLoaded()
+
+        CompactVendorDB = type(CompactVendorDB) == "table" and CompactVendorDB or {}
+        setmetatable(CompactVendorDB, { __index = CompactVendorDBDefaults })
+
         self:ModifyMerchantFrame()
         self:CreateSearchBox()
         self:CreateScrollBox()
+        self:CreateSettings()
 
     end
 
@@ -2857,6 +2977,13 @@ local CompactVendorFrameMerchantButtonTemplate do
 
     function CompactVendorFrameMerchantButtonTemplate:OnShow()
         UpdateMerchantItemButton(self, self.merchantItem)
+        local fontObject, fontSize, _, defaultFontSize = GetListItemScaleFontObject()
+        local costCountScale = fontSize/defaultFontSize
+        self.Name:SetFontObject(fontObject) ---@diagnostic disable-line: param-type-mismatch
+        for _, cost in pairs(self.Cost.Costs) do
+            cost.Icon.Count:SetScale(costCountScale)
+            cost.Icon.Text:SetScale(costCountScale)
+        end
     end
 
     function CompactVendorFrameMerchantButtonTemplate:OnHide()
