@@ -43,7 +43,7 @@ local ListItemScaleToFontObject
 local GetListItemScaleFontObject do
 
     CompactVendorDBDefaults = {
-        ListItemScale = 12,
+        ListItemScale = 13,
     }
 
     local ListItemScaleFallbackFontObject = "CompactVendorFrameFont1"
@@ -82,24 +82,24 @@ local GetListItemScaleFontObject do
     ListItemScaleToFontObject.minSize = 8
     ListItemScaleToFontObject.maxSize = 72
 
-    ---@return string fontObject, number fontSize, boolean isExactSize, number defaultFontSize
+    ---@return string fontObject, number fontSize, boolean isExactSize, number defaultFontSize, boolean isDefaultFontObject
     function GetListItemScaleFontObject()
         local listItemScale = CompactVendorDB.ListItemScale
         listItemScale = floor(listItemScale + 0.5)
         if listItemScale < ListItemScaleToFontObject.minSize then
-            return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, false, ListItemScaleFallbackFontSize
+            return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, false, ListItemScaleFallbackFontSize, true
         elseif listItemScale == ListItemScaleFallbackFontSize then
-            return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, true, ListItemScaleFallbackFontSize
+            return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, true, ListItemScaleFallbackFontSize, true
         end
         for _, font in ipairs(ListItemScaleToFontObject) do
             local size, fontObject = font[1], font[2]
             if size == listItemScale then
-                return fontObject, size, true, ListItemScaleFallbackFontSize
+                return fontObject, size, true, ListItemScaleFallbackFontSize, false
             elseif size > listItemScale then
-                return fontObject, size, false, ListItemScaleFallbackFontSize
+                return fontObject, size, false, ListItemScaleFallbackFontSize, false
             end
         end
-        return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, false, ListItemScaleFallbackFontSize
+        return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, false, ListItemScaleFallbackFontSize, true
     end
 
 end
@@ -3216,11 +3216,14 @@ local CompactVendorFrameMerchantButtonTemplate do
     end
 
     function CompactVendorFrameMerchantButtonTemplate:UpdateTextSize()
-        local fontObject, fontSize, _, defaultFontSize = GetListItemScaleFontObject()
+        local fontObject, fontSize, _, defaultFontSize, isDefaultFontObject = GetListItemScaleFontObject()
         local costCountScale = fontSize/defaultFontSize
         self.Name:SetFontObject(fontObject) ---@diagnostic disable-line: param-type-mismatch
-        self.Name:SetShadowOffset(1, -1)
-        self.Name:SetShadowColor(0, 0, 0)
+        if not isDefaultFontObject then
+            self.Name:SetShadowOffset(0, 0)
+            self.Name:SetShadowOffset(1, -1)
+            self.Name:SetShadowColor(0, 0, 0, 1)
+        end
         for _, cost in pairs(self.Cost.Costs) do
             cost.Icon.Count:SetScale(costCountScale)
             cost.Icon.Text:SetScale(costCountScale)
