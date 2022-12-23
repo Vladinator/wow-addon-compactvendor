@@ -3219,6 +3219,8 @@ local CompactVendorFrameMerchantButtonTemplate do
         local fontObject, fontSize, _, defaultFontSize = GetListItemScaleFontObject()
         local costCountScale = fontSize/defaultFontSize
         self.Name:SetFontObject(fontObject) ---@diagnostic disable-line: param-type-mismatch
+        self.Name:SetShadowOffset(1, -1)
+        self.Name:SetShadowColor(0, 0, 0)
         for _, cost in pairs(self.Cost.Costs) do
             cost.Icon.Count:SetScale(costCountScale)
             cost.Icon.Text:SetScale(costCountScale)
