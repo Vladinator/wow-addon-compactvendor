@@ -2449,8 +2449,8 @@ local CompactVendorFrameAutoSizeTemplate do
         if self.isIconTextTemplate then
             ---@diagnostic disable-next-line: assign-type-mismatch
             local cost = self ---@type CompactVendorFrameMerchantIconTemplate
-            if not cost.mode then
-                width = width - cost.Texture:GetWidth()
+            if cost and cost.Texture and not cost.mode then
+                width = width - (cost.Texture:IsShown() and cost.Texture:GetWidth() or 0)
             end
         end
         self:SetWidth(width)
@@ -3232,6 +3232,18 @@ end
 ---@class CompactVendorFrameMerchantButtonTemplate
 local CompactVendorFrameMerchantButtonTemplate do
 
+    ---@param self FontString
+    ---@param fontObject any
+    ---@param isDefaultFontObject boolean
+    local function UpdateFontStringFontObject(self, fontObject, isDefaultFontObject)
+        self:SetFontObject(fontObject)
+        if not isDefaultFontObject then
+            self:SetShadowOffset(0, 0)
+            self:SetShadowOffset(1, -1)
+            self:SetShadowColor(0, 0, 0, 1)
+        end
+    end
+
     ---@class CompactVendorFrameMerchantButtonTemplate : Button
     ---@field public merchantItem? MerchantItem
     ---@field public backgroundColor? number[]
@@ -3399,18 +3411,13 @@ local CompactVendorFrameMerchantButtonTemplate do
     end
 
     function CompactVendorFrameMerchantButtonTemplate:UpdateTextSize()
-        local fontObject, fontSize, _, defaultFontSize, isDefaultFontObject = GetListItemScaleFontObject()
-        local costCountScale = fontSize/defaultFontSize
-        self.Name:SetFontObject(fontObject) ---@diagnostic disable-line: param-type-mismatch
-        if not isDefaultFontObject then
-            self.Name:SetShadowOffset(0, 0)
-            self.Name:SetShadowOffset(1, -1)
-            self.Name:SetShadowColor(0, 0, 0, 1)
-        end
+        local fontObject, _, _, _, isDefaultFontObject = GetListItemScaleFontObject()
+        UpdateFontStringFontObject(self.Name, fontObject, isDefaultFontObject)
         for _, cost in pairs(self.Cost.Costs) do
-            cost.Icon.Count:SetScale(costCountScale)
-            cost.Icon.Text:SetScale(costCountScale)
+            UpdateFontStringFontObject(cost.Icon.Count, fontObject, isDefaultFontObject)
+            UpdateFontStringFontObject(cost.Icon.Text, fontObject, isDefaultFontObject)
         end
+        self.Cost:AutoSize()
     end
 
     function CompactVendorFrameMerchantButtonTemplate:UpdateIconMask()
