@@ -35,12 +35,12 @@
         <HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD" setAllPoints="true" />
     </Button>
 
-    <Frame name="CompactVendorFilterFrame" mixin="CompactVendorFilterFrameTemplate">
+    <!--Frame name="CompactVendorFilterFrame" mixin="CompactVendorFilterFrameTemplate">
         <Scripts>
             <OnLoad method="OnLoad" />
             <OnEvent method="OnEvent" />
         </Scripts>
-    </Frame>
+    </Frame-->
 
     <Script file="filters\affordable.lua" />
     <Script file="filters\appearance.lua" />

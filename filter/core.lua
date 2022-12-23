@@ -1,54 +1,54 @@
----@alias MerchantItem MerchantItemPolyfill
----@alias MerchantScanner Region
----@alias MerchantItemCostType number
----@alias MerchantItemAvailabilityType number
----@alias MerchantItemCostItem any[]
----@alias TooltipItem any
----@alias ItemRequirement any
+----@alias MerchantItem MerchantItemPolyfill
+----@alias MerchantScanner Region
+----@alias MerchantItemCostType number
+----@alias MerchantItemAvailabilityType number
+----@alias MerchantItemCostItem any[]
+----@alias TooltipItem any
+----@alias ItemRequirement any
 
----@class MerchantItemPolyfill
----@field public parent MerchantScanner
----@field public index number
----@field public name? string
----@field public texture number|string
----@field public price number
----@field public stackCount number
----@field public numAvailable number
----@field public isPurchasable boolean
----@field public isUsable boolean
----@field public extendedCost number
----@field public currencyID? number
----@field public spellID? number
----@field public canAfford boolean
----@field public costType MerchantItemCostType
----@field public itemLink? string
----@field public merchantItemID? number
----@field public itemLinkOrID? string|number
----@field public isHeirloom boolean
----@field public isKnownHeirloom boolean
----@field public showNonrefundablePrompt boolean
----@field public tintRed boolean
----@field public availabilityType MerchantItemAvailabilityType
----@field public extendedCostCount number
----@field public extendedCostItems MerchantItemCostItem[]
----@field public quality? number
----@field public itemID number
----@field public itemType string
----@field public itemSubType string
----@field public itemEquipLoc string
----@field public itemTexture number|string
----@field public itemClassID number
----@field public itemSubClassID number
----@field public maxStackCount? number
----@field public isLearnable? boolean
----@field public tooltipScannable? boolean
----@field public tooltipData? TooltipItem
----@field public canLearn? boolean
----@field public canLearnRequirement? ItemRequirement
----@field public isLearned? boolean
----@field public isCollected? boolean
----@field public isCollectedNum? number
----@field public isCollectedNumMax? number
+----@class MerchantItemPolyfill
+----@field public parent MerchantScanner
+----@field public index number
+----@field public name? string
+----@field public texture number|string
+----@field public price number
+----@field public stackCount number
+----@field public numAvailable number
+----@field public isPurchasable boolean
+----@field public isUsable boolean
+----@field public extendedCost number
+----@field public currencyID? number
+----@field public spellID? number
+----@field public canAfford boolean
+----@field public costType MerchantItemCostType
+----@field public itemLink? string
+----@field public merchantItemID? number
+----@field public itemLinkOrID? string|number
+----@field public isHeirloom boolean
+----@field public isKnownHeirloom boolean
+----@field public showNonrefundablePrompt boolean
+----@field public tintRed boolean
+----@field public availabilityType MerchantItemAvailabilityType
+----@field public extendedCostCount number
+----@field public extendedCostItems MerchantItemCostItem[]
+----@field public quality? number
+----@field public itemID number
+----@field public itemType string
+----@field public itemSubType string
+----@field public itemEquipLoc string
+----@field public itemTexture number|string
+----@field public itemClassID number
+----@field public itemSubClassID number
+----@field public maxStackCount? number
+----@field public isLearnable? boolean
+----@field public tooltipScannable? boolean
+----@field public tooltipData? TooltipItem
+----@field public canLearn? boolean
+----@field public canLearnRequirement? ItemRequirement
+----@field public isLearned? boolean
+----@field public isCollected? boolean
+----@field public isCollectedNum? number
+----@field public isCollectedNumMax? number
 
 ---@class DropdownInfoPolyfill
 ---@field public keepShownOnClick boolean?
@@ -390,7 +390,11 @@ local CompactVendorFilterTemplate do
     end
 
     function CompactVendorFilterTemplate:Publish()
-        CompactVendorFilterFrame:AddFilter(self)
+        if CompactVendorFilterFrame then
+            CompactVendorFilterFrame:AddFilter(self)
+        else
+            C_Timer.After(0.25, function() CompactVendorFilterFrame:AddFilter(self) end)
+        end
     end
 
 end

@@ -1341,10 +1341,11 @@ local UpdateMerchantItemButton do
     ---@param merchantItem? MerchantItem
     function UpdateMerchantItemButton(button, merchantItem)
         button.merchantItem = merchantItem
-        if not merchantItem then
+        local index = merchantItem and merchantItem:GetIndex()
+        if not merchantItem or not index then
+            button:SetID(0)
             return
         end
-        local index = merchantItem:GetIndex()
         button:SetID(index)
         button.Icon:SetItem(merchantItem, true)
         local text = GetTextForItem(merchantItem)
@@ -2253,6 +2254,23 @@ local Frame do
 
     end
 
+    function Frame:CreateFilters()
+
+        local CompactVendorFilterFrameTemplate = CompactVendorFilterFrameTemplate ---@type CompactVendorFilterFrameTemplate
+
+        if not CompactVendorFilterFrameTemplate then
+            return
+        end
+
+        ---@type CompactVendorFilterFrameTemplate
+        local frame = CreateFrame("Frame", addonName .. "FilterFrame") ---@diagnostic disable-line: assign-type-mismatch
+        Mixin(frame, CompactVendorFilterFrameTemplate)
+
+        frame:OnLoad()
+        frame:SetScript("OnEvent", frame.OnEvent)
+
+    end
+
     function Frame:OnLoad()
 
         self:SetFrameStrata("HIGH")
@@ -2276,6 +2294,7 @@ local Frame do
         self:CreateSearchBox()
         self:CreateScrollBox()
         self:CreateSettings()
+        self:CreateFilters()
 
     end
 
@@ -2977,13 +2996,7 @@ local CompactVendorFrameMerchantButtonTemplate do
 
     function CompactVendorFrameMerchantButtonTemplate:OnShow()
         UpdateMerchantItemButton(self, self.merchantItem)
-        local fontObject, fontSize, _, defaultFontSize = GetListItemScaleFontObject()
-        local costCountScale = fontSize/defaultFontSize
-        self.Name:SetFontObject(fontObject) ---@diagnostic disable-line: param-type-mismatch
-        for _, cost in pairs(self.Cost.Costs) do
-            cost.Icon.Count:SetScale(costCountScale)
-            cost.Icon.Text:SetScale(costCountScale)
-        end
+        self:UpdateTextSize()
     end
 
     function CompactVendorFrameMerchantButtonTemplate:OnHide()
@@ -3126,6 +3139,16 @@ local CompactVendorFrameMerchantButtonTemplate do
             return
         end
         BuyMerchantItem(index, quantity)
+    end
+
+    function CompactVendorFrameMerchantButtonTemplate:UpdateTextSize()
+        local fontObject, fontSize, _, defaultFontSize = GetListItemScaleFontObject()
+        local costCountScale = fontSize/defaultFontSize
+        self.Name:SetFontObject(fontObject) ---@diagnostic disable-line: param-type-mismatch
+        for _, cost in pairs(self.Cost.Costs) do
+            cost.Icon.Count:SetScale(costCountScale)
+            cost.Icon.Text:SetScale(costCountScale)
+        end
     end
 
 end
