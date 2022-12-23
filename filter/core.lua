@@ -84,7 +84,7 @@ local CompactVendorFilterButtonTemplate do
         self:RegisterForClicks("LeftButtonUp")
         self:SetPoint("RIGHT", MerchantFrameCloseButton, "LEFT", 8 - 4, 0)
         self:SetScale(0.85)
-        hooksecurefunc("MerchantFrame_Update", function() self:SetShown(MerchantFrame.selectedTab == 1) end)
+        hooksecurefunc("MerchantFrame_Update", function() self:SetShown(self.Menu and MerchantFrame.selectedTab == 1) end)
     end
 
     function CompactVendorFilterButtonTemplate:OnEnter()
@@ -393,7 +393,7 @@ local CompactVendorFilterTemplate do
         if CompactVendorFilterFrame then
             CompactVendorFilterFrame:AddFilter(self)
         else
-            C_Timer.After(0.25, function() CompactVendorFilterFrame:AddFilter(self) end)
+            C_Timer.After(0.25, function() if CompactVendorFilterFrame then CompactVendorFilterFrame:AddFilter(self) end end)
         end
     end
 

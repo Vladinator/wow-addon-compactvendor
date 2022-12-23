@@ -2278,10 +2278,10 @@ local Frame do
         self:SetPoint("TOPLEFT", MerchantFrameInset, "TOPLEFT", 3, -2)
         self:SetPoint("BOTTOMRIGHT", MerchantFrameInset, "BOTTOMRIGHT", -20, 55)
 
-        self:SetScript("OnShow", self.OnShow)
-        self:SetScript("OnHide", self.OnHide)
         self:SetScript("OnEvent", self.OnEvent)
         FrameUtil.RegisterFrameForEvents(self, self.Events)
+
+        hooksecurefunc("MerchantFrame_Update", function() self:SetShown(MerchantFrame.selectedTab == 1) end)
 
     end
 
@@ -2296,12 +2296,6 @@ local Frame do
         self:CreateSettings()
         self:CreateFilters()
 
-    end
-
-    function Frame:OnShow()
-    end
-
-    function Frame:OnHide()
     end
 
     Frame:OnLoad()
