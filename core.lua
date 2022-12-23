@@ -2291,9 +2291,60 @@ local Frame do
 
     function Frame:CreateSettings()
 
+        ---@class MinimalSliderTemplate : Slider
+        ---@field public obeyStepOnDrag boolean
+        ---@field public Left Texture
+        ---@field public Right Texture
+        ---@field public Middle Texture
+        ---@field public Thumb Texture # ThumbTexture
+
+        ---@class MinimalSliderWithSteppersTemplate : Frame
+        ---@field public Slider MinimalSliderTemplate
+        ---@field public Back Button
+        ---@field public Forward Button
+        ---@field public LeftText FontString
+        ---@field public RightText FontString
+        ---@field public TopText FontString
+        ---@field public MinText FontString
+        ---@field public MaxText FontString
+        ---@field public Init fun(self: MinimalSliderWithSteppersTemplate, value: number, minValue: number, maxValue: number, steps: number, formatters: any[])
+        ---@field public SetValue fun(self: MinimalSliderWithSteppersTemplate, value: number)
+        ---@field public RegisterCallback fun(self: MinimalSliderWithSteppersTemplate, event: string, callback: fun(ownerID: number, value: number))
+
+        ---@class SettingsAdvancedSliderTemplate : Frame
+        ---@field public Text FontString
+        ---@field public SliderWithSteppers MinimalSliderWithSteppersTemplate
+
+        local panel = CreateFrame("Frame")
+
+        do
+
+            local name = "Text size (px)"
+            local variable = "ListItemScale"
+            local currentValue = CompactVendorDB[variable]
+            local minValue, maxValue, step = ListItemScaleToFontObject.minSize, ListItemScaleToFontObject.maxSize, 1
+
+            ---@type SettingsAdvancedSliderTemplate
+            local control = CreateFrame("Frame", nil, panel, "SettingsAdvancedSliderTemplate") ---@diagnostic disable-line: assign-type-mismatch
+
+            control:SetPoint("TOPLEFT", 0, 0)
+            control.Text:SetText(name)
+
+            control.SliderWithSteppers:Init(currentValue, minValue, maxValue, (maxValue - minValue) * step, {
+                [MinimalSliderWithSteppersMixin.Label.Right] = function(value) return tostring(value) end,
+            })
+
+            control.SliderWithSteppers:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
+                currentValue = value
+                CompactVendorDB[variable] = value
+            end)
+
+        end
+
         ---@alias SettingsTextContainerPolyfillGetDataFunc fun(self: SettingsControlTextContainerPolyfill): SettingsSliderOptionsPolyfill[]
 
         ---@class SettingsPolyfill
+        ---@field public RegisterCanvasLayoutCategory fun(frame: Region, name: string): SettingsCategoryPolyfill
         ---@field public RegisterVerticalLayoutCategory fun(name: string): SettingsCategoryPolyfill
         ---@field public RegisterProxySetting fun(category: SettingsCategoryPolyfill, variable: string, db: table, defaultValueType: type, name: string, defaultValue: any): SettingsProxySettingPolyfill
         ---@field public CreateCheckBox fun(category: SettingsCategoryPolyfill, setting: SettingsProxySettingPolyfill, tooltip: string)
@@ -2316,20 +2367,7 @@ local Frame do
 
         local Settings = Settings ---@type SettingsPolyfill
 
-        local category = Settings.RegisterVerticalLayoutCategory(addonName)
-
-        do
-            local name = "Merchant Item Size (px)"
-            local tooltip = "Specify the font text size used in the merchant item buttons."
-            local variable = "ListItemScale"
-            local defaultValue = CompactVendorDBDefaults[variable]
-            local minValue, maxValue, step = ListItemScaleToFontObject.minSize, ListItemScaleToFontObject.maxSize, 1
-            local setting = Settings.RegisterProxySetting(category, variable, CompactVendorDB, type(defaultValue), name, defaultValue)
-            local options = Settings.CreateSliderOptions(minValue, maxValue, step)
-            options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right)
-            Settings.CreateSlider(category, setting, options, tooltip)
-        end
-
+        local category = Settings.RegisterCanvasLayoutCategory(panel, addonName)
         Settings.RegisterAddOnCategory(category)
 
     end
