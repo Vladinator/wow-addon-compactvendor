@@ -2736,6 +2736,131 @@ end
 ---@class CompactVendorFrameMerchantIconTemplate
 local CompactVendorFrameMerchantIconTemplate do
 
+    ---@enum IconShape
+    local IconShape = {
+        None = 0,
+        Round = 1,
+        Square = 2,
+        Diamond = 3,
+        Hexagon = 4,
+        Octagon = 5,
+    }
+
+    ---@class IconShapeInfoItemData
+    ---@field public file number|string
+    ---@field public size number
+    ---@field public anchor AnchorPoint
+    ---@field public texCoords? number[]
+    ---@field public mask string|number
+    ---@field public maskSize number
+    ---@field public maskAnchor AnchorPoint
+
+    ---@class IconShapeInfoItem
+    ---@field public icon IconShapeInfoItemData
+    ---@field public border IconShapeInfoItemData
+
+    local TextureHiddenFileID = 130871
+
+    local IconShapeDefaultData = {
+        icon = {
+            size = 20,
+            anchor = { "LEFT", 4, 0 },
+            mask = TextureHiddenFileID,
+            maskSize = 16,
+            maskAnchor = { "LEFT", 6, 0 },
+        },
+        border = {
+            file = TextureHiddenFileID,
+            size = 22,
+            anchor = { "CENTER", "$parent.Texture", "CENTER" },
+            texCoords = { 0.046875, 0.578125, 0.03125, 0.578125 },
+            mask = TextureHiddenFileID,
+            maskSize = 20,
+            maskAnchor = { "LEFT", 4, 0 },
+        },
+    }
+
+    local IconShapeDefaultDataIcon = { __index = IconShapeDefaultData.icon }
+    local IconShapeDefaultDataBorder = { __index = IconShapeDefaultData.border }
+
+    ---@param partial IconShapeInfoItem
+    local function InheritFromBase(partial)
+        partial.icon = setmetatable(partial.icon or {}, IconShapeDefaultDataIcon)
+        partial.border = setmetatable(partial.border or {}, IconShapeDefaultDataBorder)
+        return partial
+    end
+
+    ---@type IconShapeInfoItem[]
+    local IconShapeInfo = {
+        [IconShape.None] = InheritFromBase({
+        }),
+        [IconShape.Round] = InheritFromBase({
+            icon = {
+                mask = 130924,
+            },
+            border = {
+                file = "Interface\\Minimap\\MiniMap-TrackingBorder",
+            },
+        }),
+        [IconShape.Square] = InheritFromBase({
+            icon = {
+                mask = 2443038,
+            },
+        }),
+        [IconShape.Diamond] = InheritFromBase({
+            icon = {
+                mask = 3152572,
+            },
+        }),
+        [IconShape.Hexagon] = InheritFromBase({
+            icon = {
+                mask = 426723,
+            },
+        }),
+        [IconShape.Octagon] = InheritFromBase({
+            icon = {
+                mask = 3750798,
+            },
+        }),
+    }
+
+    ---@param self Region
+    ---@param anchor AnchorPoint
+    local function UnpackAnchorArgs(self, anchor)
+        local anchor1, anchor2, anchor3, anchor4, anchor5 = unpack(anchor) ---@diagnostic disable-line: param-type-mismatch
+        if anchor2 == "$parent.Texture" then
+            anchor2 = self:GetParent().Texture ---@diagnostic disable-line: undefined-field
+        end
+        return anchor1, anchor2, anchor3, anchor4, anchor5
+    end
+
+    ---@param info IconShapeInfoItemData
+    ---@param texture Texture
+    ---@param textureMask Texture
+    ---@param isBorder boolean?
+    local function SetShape(info, texture, textureMask, isBorder)
+        local invisibleTexture = info.file == TextureHiddenFileID
+        local invisibleTextureMask = info.mask == TextureHiddenFileID
+        texture:SetShown(not invisibleTexture)
+        textureMask:SetShown(not invisibleTextureMask)
+        if isBorder then
+            texture:SetTexture(info.file)
+            texture:SetDesaturated(true)
+        end
+        texture:SetSize(info.size, info.size)
+        texture:ClearAllPoints()
+        texture:SetPoint(UnpackAnchorArgs(texture, info.anchor))
+        if info.texCoords then
+            texture:SetTexCoord(unpack(info.texCoords))
+        else
+            texture:SetTexCoord(0, 1, 0, 1)
+        end
+        textureMask:SetTexture(info.mask, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        textureMask:SetSize(info.maskSize, info.maskSize)
+        textureMask:ClearAllPoints()
+        textureMask:SetPoint(UnpackAnchorArgs(textureMask, info.maskAnchor))
+    end
+
     ---@class CompactVendorFrameMerchantIconTemplate : CompactVendorFrameAutoSizeTemplate
     ---@field public Texture Texture
     ---@field public TextureMask Texture #MaskTexture
@@ -2801,6 +2926,14 @@ local CompactVendorFrameMerchantIconTemplate do
         self:SetMode(false)
     end
 
+    ---@param shape IconShape
+    function CompactVendorFrameMerchantIconTemplate:SetShape(shape)
+        local shapeInfo = shape and IconShapeInfo[shape] or IconShapeInfo[IconShape.None]
+        self.shapeInfo = shapeInfo
+        SetShape(shapeInfo.icon, self.Texture, self.TextureMask)
+        SetShape(shapeInfo.border, self.Border, self.BorderMask, true)
+    end
+
     ---@param asIcon boolean
     function CompactVendorFrameMerchantIconTemplate:SetMode(asIcon)
         self.mode = asIcon
@@ -2808,6 +2941,17 @@ local CompactVendorFrameMerchantIconTemplate do
         self.Border:SetShown(asIcon)
         self.Count:SetShown(asIcon)
         self.Text:SetShown(not asIcon)
+        local showTextureMask = asIcon
+        local showBorder = asIcon
+        local showBorderMask = asIcon
+        if asIcon and self.shapeInfo then
+            showTextureMask = self.shapeInfo.icon.mask ~= TextureHiddenFileID
+            showBorder = self.shapeInfo.border.file ~= TextureHiddenFileID
+            showBorderMask = self.shapeInfo.border.mask ~= TextureHiddenFileID
+        end
+        self.TextureMask:SetShown(showTextureMask)
+        self.Border:SetShown(showBorder)
+        self.BorderMask:SetShown(showBorderMask)
     end
 
 end
@@ -3109,6 +3253,7 @@ local CompactVendorFrameMerchantButtonTemplate do
     function CompactVendorFrameMerchantButtonTemplate:OnShow()
         UpdateMerchantItemButton(self, self.merchantItem)
         self:UpdateTextSize()
+        -- self:UpdateIconMask() -- TODO: WIP
     end
 
     function CompactVendorFrameMerchantButtonTemplate:OnHide()
@@ -3265,6 +3410,14 @@ local CompactVendorFrameMerchantButtonTemplate do
         for _, cost in pairs(self.Cost.Costs) do
             cost.Icon.Count:SetScale(costCountScale)
             cost.Icon.Text:SetScale(costCountScale)
+        end
+    end
+
+    function CompactVendorFrameMerchantButtonTemplate:UpdateIconMask()
+        local shape = 1 -- TODO: WIP
+        self.Icon:SetShape(shape)
+        for _, cost in pairs(self.Cost.Costs) do
+            cost.Icon:SetShape(shape)
         end
     end
 
