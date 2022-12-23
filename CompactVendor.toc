@@ -8,3 +8,4 @@
 ## X-WoWI-ID: 25073
 libs.xml
 core.xml
+filter\core.xml

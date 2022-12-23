@@ -1,0 +1,56 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\..\FrameXML\UI.xsd">
+
+    <Script file="core.lua" />
+
+    <Button name="CompactVendorFilterButton" mixin="CompactVendorFilterButtonTemplate">
+        <Size x="32" y="32" />
+        <Layers>
+            <Layer level="ARTWORK">
+                <Texture parentKey="Icon" file="Interface\ChatFrame\ChatFrameExpandArrow" hidden="true">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" />
+                        <Anchor point="BOTTOMRIGHT" />
+                    </Anchors>
+                </Texture>
+            </Layer>
+            <Layer level="OVERLAY">
+                <Texture parentKey="All" file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD" hidden="true">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" />
+                        <Anchor point="BOTTOMRIGHT" />
+                    </Anchors>
+                </Texture>
+            </Layer>
+        </Layers>
+        <Scripts>
+            <OnLoad method="OnLoad" />
+            <OnEnter method="OnEnter" />
+            <OnLeave method="OnLeave" />
+            <OnMouseDown method="OnMouseDown" />
+        </Scripts>
+        <NormalTexture setAllPoints="true" file="Interface\ChatFrame\UI-ChatIcon-ScrollDown-Up" />
+        <PushedTexture setAllPoints="true" file="Interface\ChatFrame\UI-ChatIcon-ScrollDown-Down" />
+        <DisabledTexture setAllPoints="true" file="Interface\ChatFrame\UI-ChatIcon-ScrollDown-Disabled" />
+        <HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD" setAllPoints="true" />
+    </Button>
+
+    <Frame name="CompactVendorFilterFrame" mixin="CompactVendorFilterFrameTemplate">
+        <Scripts>
+            <OnLoad method="OnLoad" />
+            <OnEvent method="OnEvent" />
+        </Scripts>
+    </Frame>
+
+    <Script file="filters\affordable.lua" />
+    <Script file="filters\appearance.lua" />
+    <Script file="filters\collected.lua" />
+    <Script file="filters\known.lua" />
+    <Script file="filters\purchasable.lua" />
+    <Script file="filters\quality.lua" />
+    <Script file="filters\slot.lua" />
+    <Script file="filters\stats.lua" />
+    <Script file="filters\type.lua" />
+    <Script file="filters\usable.lua" />
+
+</Ui>
