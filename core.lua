@@ -15,6 +15,7 @@ local MerchantFrame_ConfirmExtendedItemCost = MerchantFrame_ConfirmExtendedItemC
 local StaticPopup_Visible = StaticPopup_Visible ---@type fun(name: string): any, any
 local CreateObjectPool = CreateObjectPool ---@type ObjectPoolFunction
 local CreateFramePool = CreateFramePool ---@type FramePoolFunction
+local IsCosmeticItem = IsCosmeticItem ---@type fun(item: string|number): boolean
 local CallbackRegistryMixin = CallbackRegistryMixin ---@type CallbackRegistry
 local FrameUtil = FrameUtil ---@type table<any, any>
 local MathUtil = MathUtil ---@type table<any, any>
@@ -567,7 +568,7 @@ local IsTooltipTextPending do
         for _, line in ipairs(self.tooltipData.lines) do
             if line:IsTypeText() then
                 local text = line:GetLeftText()
-                if text == ITEM_SPELL_KNOWN then
+                if text == ITEM_SPELL_KNOWN or text == ERR_COSMETIC_KNOWN then
                     local color = line:GetLeftColor()
                     return ColorIsRed(color)
                 end
@@ -1091,6 +1092,7 @@ local UpdateMerchantItemButton do
     ---@field public itemClassID number
     ---@field public itemSubClassID number
     ---@field public maxStackCount? number
+    ---@field public isCosmetic? boolean
     ---@field public isLearnable? boolean
     ---@field public tooltipScannable? boolean
     ---@field public tooltipData? TooltipItem
@@ -1203,8 +1205,8 @@ local UpdateMerchantItemButton do
         self.itemLink = GetMerchantItemLink(index)---@diagnostic disable-line: assign-type-mismatch
         self.merchantItemID = GetMerchantItemID(index)---@diagnostic disable-line: assign-type-mismatch
         self.itemLinkOrID = self.itemLink or self.merchantItemID
-        self.isHeirloom = self.merchantItemID and C_Heirloom.IsItemHeirloom(self.merchantItemID)---@diagnostic disable-line: assign-type-mismatch
-        self.isKnownHeirloom = self.isHeirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID)---@diagnostic disable-line: assign-type-mismatch
+        self.isHeirloom = self.merchantItemID and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
+        self.isKnownHeirloom = self.isHeirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
         self.showNonrefundablePrompt = not C_MerchantFrame.IsMerchantItemRefundable(index)
         self.tintRed = not self.isPurchasable or (not self.isUsable and not self.isHeirloom)
         if self.numAvailable == 0 or self.isKnownHeirloom then
@@ -1258,8 +1260,10 @@ local UpdateMerchantItemButton do
         self.itemClassID,
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
-        self.isLearnable = self:IsLearnable()
-        self.tooltipScannable = self.isLearnable or true -- DEBUG: performance check by scanning all the items
+        self.isCosmetic = IsCosmeticItem(self.itemLinkOrID)
+        self.isTransmog = C_Transmog.CanTransmogItem(self.itemLinkOrID) ---@diagnostic disable-line: param-type-mismatch
+        self.isLearnable = self.isCosmetic or self.isTransmog or self:IsLearnable()
+        self.tooltipScannable = self.isLearnable
         if not self.tooltipScannable then
             return
         end
