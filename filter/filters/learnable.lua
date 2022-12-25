@@ -8,7 +8,10 @@ do
             if itemData.isHeirloom then
                 return itemData.isKnownHeirloom ~= nil
             end
-            return itemData.isLearnable and (itemData.isLearned ~= nil or itemData.isCollected ~= nil)
+            if itemData.isToy then
+                return itemData.isToyCollected ~= nil
+            end
+            return not not itemData.isLearnable
         end,
         function(self, value)
             return value and YES or NO
@@ -23,12 +26,12 @@ end
 do
 
     local filter = CompactVendorFilterDropDownToggleWrapperTemplate:New(
-        "Learnable: Known/Collected",
+        "Learnable: Collected",
         function(self, itemLink, itemData)
-            if (not itemData.isHeirloom) and (not itemData.isLearnable) and (not itemData.isCollectedNum) then
+            if (not itemData.isHeirloom) and (not itemData.isToy) and (not itemData.isLearnable) and (not itemData.isCollectedNum) then
                 return
             end
-            return itemData.isKnownHeirloom or itemData.isLearned or itemData.isCollected
+            return itemData.isKnownHeirloom or itemData.isToyCollected or itemData.isLearned or (itemData.isCollectedNum and itemData.isCollectedNum > 0) or false
         end,
         function(self, value)
             return value and YES or NO

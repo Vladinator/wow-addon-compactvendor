@@ -307,6 +307,71 @@ local ConvertToPattern do
 
 end
 
+local IsTransmogCollected do
+
+    local Model = CreateFrame("DressUpModel")
+
+    local InventorySlots = {
+        ["INVTYPE_HEAD"] = 1,
+        ["INVTYPE_NECK"] = 2,
+        ["INVTYPE_SHOULDER"] = 3,
+        ["INVTYPE_BODY"] = 4,
+        ["INVTYPE_CHEST"] = 5,
+        ["INVTYPE_ROBE"] = 5,
+        ["INVTYPE_WAIST"] = 6,
+        ["INVTYPE_LEGS"] = 7,
+        ["INVTYPE_FEET"] = 8,
+        ["INVTYPE_WRIST"] = 9,
+        ["INVTYPE_HAND"] = 10,
+        ["INVTYPE_CLOAK"] = 15,
+        ["INVTYPE_WEAPON"] = 16,
+        ["INVTYPE_SHIELD"] = 17,
+        ["INVTYPE_2HWEAPON"] = 16,
+        ["INVTYPE_WEAPONMAINHAND"] = 16,
+        ["INVTYPE_RANGED"] = 16,
+        ["INVTYPE_RANGEDRIGHT"] = 16,
+        ["INVTYPE_WEAPONOFFHAND"] = 17,
+        ["INVTYPE_HOLDABLE"] = 17,
+        ["INVTYPE_TABARD"] = 19,
+    }
+
+    ---@param itemLinkOrID any
+    ---@return boolean canCollect, boolean? isCollected
+    function IsTransmogCollected(itemLinkOrID)
+        local itemID, _, _, slotName = GetItemInfoInstant(itemLinkOrID)
+        if not slotName then
+            return false
+        end
+        local slot = InventorySlots[slotName]
+        if not slot then
+            return false
+        end
+        if itemLinkOrID == itemID then
+            itemLinkOrID = format("item:%d", itemID)
+        end
+        if not C_Item.IsDressableItemByID(itemLinkOrID) then
+            return false
+        end
+        Model:SetUnit("player")
+        Model:Undress()
+        Model:TryOn(itemLinkOrID, slot) ---@diagnostic disable-line: redundant-parameter
+        local sourceID ---@type number?
+        ---@diagnostic disable-next-line: undefined-field
+        if Model.GetItemTransmogInfo then
+            local sourceInfo = Model:GetItemTransmogInfo(slot) ---@diagnostic disable-line: undefined-field
+            sourceID = sourceInfo and sourceInfo.appearanceID
+        else
+            sourceID = Model:GetSlotTransmogSources(slot)
+        end
+        if not sourceID then
+            return false
+        end
+        local categoryID, appearanceID, canEnchant, texture, isCollected, itemLink = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
+        return true, isCollected
+    end
+
+end
+
 local CreateTooltipItem
 local IsTooltipTextPending do
 
@@ -1092,7 +1157,12 @@ local UpdateMerchantItemButton do
     ---@field public itemClassID number
     ---@field public itemSubClassID number
     ---@field public maxStackCount? number
+    ---@field public isTransmog? boolean
+    ---@field public isTransmogCollectable? boolean
+    ---@field public isTransmogCollected? boolean
     ---@field public isCosmetic? boolean
+    ---@field public isToy? boolean
+    ---@field public isToyCollected? boolean
     ---@field public isLearnable? boolean
     ---@field public tooltipScannable? boolean
     ---@field public tooltipData? TooltipItem
@@ -1260,9 +1330,13 @@ local UpdateMerchantItemButton do
         self.itemClassID,
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
-        self.isCosmetic = IsCosmeticItem(self.itemLinkOrID)
         self.isTransmog = C_Transmog.CanTransmogItem(self.itemLinkOrID) ---@diagnostic disable-line: param-type-mismatch
-        self.isLearnable = self.isCosmetic or self.isTransmog or self:IsLearnable()
+        self.isTransmogCollectable,
+        self.isTransmogCollected = IsTransmogCollected(self.itemLinkOrID)
+        self.isCosmetic = IsCosmeticItem(self.itemLinkOrID)
+        self.isToy = C_ToyBox.GetToyInfo(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
+        self.isToyCollected = PlayerHasToy(self.merchantItemID)
+        self.isLearnable = self.isCosmetic or self:IsLearnable()
         self.tooltipScannable = self.isLearnable
         if not self.tooltipScannable then
             return
@@ -1440,6 +1514,9 @@ local UpdateMerchantItemButton do
         local isPurchasable = not merchantItem.tintRed
         local isUsable = merchantItem.isUsable
         local canAfford = merchantItem.canAfford
+        local isTransmogCollectable = merchantItem.isTransmogCollectable
+        local isTransmogCollected = merchantItem.isTransmogCollected
+        local isToyCollected = merchantItem.isToyCollected
         local canLearn = merchantItem.canLearn
         local canLearnRequirement = merchantItem.canLearnRequirement
         local isLearned = merchantItem.isLearned
@@ -1449,7 +1526,7 @@ local UpdateMerchantItemButton do
         if not isPurchasable or not isUsable or not canAfford then
             backgroundColor = BackgroundColorPreset.Red
         end
-        if isLearned or isCollected then
+        if isToyCollected or isLearned or isCollected then
             backgroundColor = BackgroundColorPreset.None
             textColor = ColorPreset.Gray
         elseif canLearnRequirement and canLearnRequirement.type == 1 then -- Profession
