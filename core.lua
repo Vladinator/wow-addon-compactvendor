@@ -121,10 +121,11 @@ local ConvertToPattern do
     ---@field public g number
     ---@field public b number
     ---@field public hex string
+    ---@field public name string
 
     ItemQualityColorToHexColor = {} ---@type table<number, SimpleColor>
     ItemHexColorToQualityIndex = {} ---@type table<string, number>
-    ColorPreset = {} ---@type table<string|number, string|SimpleColor>
+    ColorPreset = {} ---@type table<string|number, SimpleColor>
 
     for i = 0, 8 do
 
@@ -136,6 +137,7 @@ local ConvertToPattern do
             g = g,
             b = b,
             hex = hex,
+            name = _G[format("ITEM_QUALITY%d_DESC", i)],
         }
 
         ItemQualityColorToHexColor[i] = color
@@ -144,6 +146,75 @@ local ConvertToPattern do
         ColorPreset[hex] = color
 
     end
+
+    ---@param key string
+    ---@param hex string|SimpleColor
+    ---@param r number?
+    ---@param g number?
+    ---@param b number?
+    ---@return SimpleColor? color
+    local function AppendColor(key, hex, r, g, b)
+
+        local color ---@type SimpleColor?
+
+        if type(hex) == "table" then
+
+            color = hex
+            hex = color.hex
+            r = color.r or r
+            g = color.g or g
+            b = color.b or b
+            color.name = color.name or key
+
+        elseif type(hex) == "string" then
+
+            color = {
+                r = r, ---@diagnostic disable-line: assign-type-mismatch
+                g = g, ---@diagnostic disable-line: assign-type-mismatch
+                b = b, ---@diagnostic disable-line: assign-type-mismatch
+                hex = hex,
+                name = key,
+            }
+
+        end
+
+        if not r or not g or not b then
+
+            r = tonumber(hex:sub(3, 4), 16)
+            g = tonumber(hex:sub(5, 6), 16)
+            b = tonumber(hex:sub(7, 8), 16)
+
+            if r and g and b then
+
+                r = r/255
+                g = g/255
+                b = b/255
+
+                color.r = r
+                color.g = g
+                color.b = b
+
+            end
+
+        end
+
+        if not color or not r or not g or not b then
+            return
+        end
+
+        local index = #ItemQualityColorToHexColor + 1
+        ItemQualityColorToHexColor[index] = color
+        ItemHexColorToQualityIndex[key] = color
+        ItemHexColorToQualityIndex[color.hex] = index
+        ColorPreset[key] = color
+        ColorPreset[index] = color
+        ColorPreset[color.hex] = color
+        return color
+
+    end
+
+    AppendColor("System", "ffffff00")
+    AppendColor("Spell", "ff71d5ff")
 
     ItemHexColorToQualityIndex.None = ItemHexColorToQualityIndex[0]
     ColorPreset.None = ColorPreset[0]
@@ -304,6 +375,8 @@ local ConvertToPattern do
         pattern = pattern:gsub("%%%%%%[%d%.%,]+f", "([%%d%%.%%,]+)")
         return pattern
     end
+
+    ns.ItemQualityColorToHexColor = ItemQualityColorToHexColor ---@type SimpleColor[]
 
 end
 
@@ -1258,6 +1331,10 @@ local UpdateMerchantItemButton do
         return false
     end
 
+    function MerchantItem:HasLimitedAvailability()
+        return self.numAvailable and self.numAvailable > 0
+    end
+
     function MerchantItem:Refresh()
         local index = self:GetIndex()
         self.name, self.texture, self.price, self.stackCount, self.numAvailable, self.isPurchasable, self.isUsable, self.extendedCost, self.currencyID, self.spellID = GetMerchantItemInfo(index) ---@diagnostic disable-line: assign-type-mismatch
@@ -1316,7 +1393,7 @@ local UpdateMerchantItemButton do
         if not self.quality and self.itemLink then
             self.quality = GetQualityFromLink(self.itemLink)
         end
-        if self.quality then
+        if not self.qualityColor and self.quality then
             self.qualityColor = GetColorFromQuality(self.quality)
         end
         if not self.itemLinkOrID then
@@ -1334,8 +1411,8 @@ local UpdateMerchantItemButton do
         self.isTransmogCollectable,
         self.isTransmogCollected = IsTransmogCollected(self.itemLinkOrID)
         self.isCosmetic = IsCosmeticItem(self.itemLinkOrID)
-        self.isToy = C_ToyBox.GetToyInfo(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
-        self.isToyCollected = PlayerHasToy(self.merchantItemID)
+        self.isToy = self.merchantItemID and C_ToyBox.GetToyInfo(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
+        self.isToyCollected = self.merchantItemID and PlayerHasToy(self.merchantItemID)
         self.isLearnable = self.isCosmetic or self:IsLearnable()
         self.tooltipScannable = self.isLearnable
         if not self.tooltipScannable then
@@ -1761,7 +1838,7 @@ local MerchantScanner do
         local pending = 0
         for index = 1, numMerchantItems do
             local itemData = activeItems and activeItems[index] or self.itemPool:Acquire()
-            if itemData:IsDirty(index) or isFullUpdate == true or (predicate and predicate(itemData)) then
+            if itemData:IsDirty(index) or isFullUpdate == true or itemData:HasLimitedAvailability() or (predicate and predicate(itemData)) then
                 pending = pending + 1
                 itemData:Refresh()
                 if not itemData:IsPending() then

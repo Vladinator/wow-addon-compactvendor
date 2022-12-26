@@ -1,13 +1,16 @@
 local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate ---@type CompactVendorFilterDropDownTemplate
 
+local ns = select(2, ...) ---@class CompactVendorNS
+local ItemQualityColorToHexColor = ns.ItemQualityColorToHexColor
+
 local options = {}
-for i = 0, 8 do
-    local _, _, _, hex = GetItemQualityColor(i)
+for i = 0, #ItemQualityColorToHexColor do
+    local color = ItemQualityColorToHexColor[i]
     options[i + 1] = {
         index = i,
         value = i,
-        text = _G[format("ITEM_QUALITY%d_DESC", i)],
-        colorCode = format("|c%s", hex),
+        text = color.name,
+        colorCode = format("|c%s", color.hex),
     }
 end
 
