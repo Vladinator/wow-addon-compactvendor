@@ -3,7 +3,7 @@ local CompactVendorFilterDropDownToggleWrapperTemplate = CompactVendorFilterDrop
 local filter = CompactVendorFilterDropDownToggleWrapperTemplate:New(
     "Appearance",
     function(self, itemLink, itemData)
-        if not itemData.isTransmog then
+        if not itemData.isTransmog or itemData.isTransmogCollectable == nil then
             return
         end
         if not itemData.isTransmogCollectable then

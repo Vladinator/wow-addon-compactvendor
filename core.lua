@@ -382,64 +382,20 @@ end
 
 local IsTransmogCollected do
 
-    local Model = CreateFrame("DressUpModel")
-
-    local InventorySlots = {
-        ["INVTYPE_HEAD"] = 1,
-        ["INVTYPE_NECK"] = 2,
-        ["INVTYPE_SHOULDER"] = 3,
-        ["INVTYPE_BODY"] = 4,
-        ["INVTYPE_CHEST"] = 5,
-        ["INVTYPE_ROBE"] = 5,
-        ["INVTYPE_WAIST"] = 6,
-        ["INVTYPE_LEGS"] = 7,
-        ["INVTYPE_FEET"] = 8,
-        ["INVTYPE_WRIST"] = 9,
-        ["INVTYPE_HAND"] = 10,
-        ["INVTYPE_CLOAK"] = 15,
-        ["INVTYPE_WEAPON"] = 16,
-        ["INVTYPE_SHIELD"] = 17,
-        ["INVTYPE_2HWEAPON"] = 16,
-        ["INVTYPE_WEAPONMAINHAND"] = 16,
-        ["INVTYPE_RANGED"] = 16,
-        ["INVTYPE_RANGEDRIGHT"] = 16,
-        ["INVTYPE_WEAPONOFFHAND"] = 17,
-        ["INVTYPE_HOLDABLE"] = 17,
-        ["INVTYPE_TABARD"] = 19,
-    }
-
-    ---@param itemLinkOrID any
-    ---@return boolean canCollect, boolean? isCollected
-    function IsTransmogCollected(itemLinkOrID)
-        local itemID, _, _, slotName = GetItemInfoInstant(itemLinkOrID)
-        if not slotName then
+    ---@param itemLink string
+    ---@return boolean? canCollect, boolean? isCollected
+    function IsTransmogCollected(itemLink)
+        if type(itemLink) ~= "string" then
+            return
+        end
+        if not C_Transmog.CanTransmogItem(itemLink) then
             return false
         end
-        local slot = InventorySlots[slotName]
-        if not slot then
-            return false
-        end
-        if itemLinkOrID == itemID then
-            itemLinkOrID = format("item:%d", itemID)
-        end
-        if not C_Item.IsDressableItemByID(itemLinkOrID) then
-            return false
-        end
-        Model:SetUnit("player")
-        Model:Undress()
-        Model:TryOn(itemLinkOrID, slot) ---@diagnostic disable-line: redundant-parameter
-        local sourceID ---@type number?
-        ---@diagnostic disable-next-line: undefined-field
-        if Model.GetItemTransmogInfo then
-            local sourceInfo = Model:GetItemTransmogInfo(slot) ---@diagnostic disable-line: undefined-field
-            sourceID = sourceInfo and sourceInfo.appearanceID
-        else
-            sourceID = Model:GetSlotTransmogSources(slot)
-        end
+        local _, sourceID = C_TransmogCollection.GetItemInfo(itemLink)
         if not sourceID then
-            return false
+            return true, false
         end
-        local categoryID, appearanceID, canEnchant, texture, isCollected, itemLink = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
+        local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
         return true, isCollected
     end
 
@@ -1409,7 +1365,7 @@ local UpdateMerchantItemButton do
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
         self.isTransmog = C_Transmog.CanTransmogItem(self.itemLinkOrID) ---@diagnostic disable-line: param-type-mismatch
         self.isTransmogCollectable,
-        self.isTransmogCollected = IsTransmogCollected(self.itemLinkOrID)
+        self.isTransmogCollected = IsTransmogCollected(self.itemLink)
         self.isCosmetic = IsCosmeticItem(self.itemLinkOrID)
         self.isToy = self.merchantItemID and C_ToyBox.GetToyInfo(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
         self.isToyCollected = self.merchantItemID and PlayerHasToy(self.merchantItemID)
