@@ -1410,6 +1410,9 @@ local UpdateMerchantItemButton do
         end
         ---@param data TooltipItem
         local function HandleTooltipData(data)
+            if not self.merchantItemID or self.merchantItemID ~= data:GetID() then
+                return
+            end
             self.tooltipData = data
             ProcessTooltipData()
         end
