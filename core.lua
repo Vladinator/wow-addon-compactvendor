@@ -866,7 +866,7 @@ local TooltipScanner do
     ---@param optionalArg1? number
     ---@param optionalArg2? number
     ---@param hideVendorPrice? boolean
-    ---@return TooltipItem|boolean tooltipData, boolean isPending
+    ---@return TooltipItem|false tooltipData, boolean isPending
     function TooltipScanner:ScanHyperlink(hyperlinkOrItemID, optionalArg1, optionalArg2, hideVendorPrice)
         local hyperlink = self:SanitizeHyperlink(hyperlinkOrItemID)
         if not hyperlink then
@@ -892,7 +892,7 @@ local TooltipScanner do
     end
 
     ---@param index number
-    ---@return TooltipItem|boolean tooltipData, boolean isPending
+    ---@return TooltipItem|false tooltipData, boolean isPending
     function TooltipScanner:ScanMerchantItem(index)
         local tooltipData = C_TooltipInfo.GetMerchantItem(index)
         if not tooltipData then
@@ -1028,7 +1028,7 @@ local TooltipDataProvider do
     ---@param query TooltipDataProviderCallbackKey
     ---@param callback? TooltipDataProviderCallback
     ---@param skipCallbackWhenInstant? boolean
-    ---@return TooltipItem? itemData
+    ---@return TooltipItem|boolean|nil itemData
     function TooltipDataProvider:ScanHyperlink(query, callback, skipCallbackWhenInstant)
         if type(callback) ~= "function" then
             callback = nil
@@ -1048,10 +1048,13 @@ local TooltipDataProvider do
             self:RegisterCallback(hyperlink, callback)
         end
         if isPending then
-            return
+            return true
         end
         self:SetPending(hyperlink)
-        local tooltipData = TooltipScanner:ScanHyperlink(hyperlink)
+        local tooltipData, tooltipIsPending = TooltipScanner:ScanHyperlink(hyperlink)
+        if tooltipIsPending then
+            return tooltipData
+        end
         if tooltipData == false then
             self:ClearPending(hyperlink)
         end
@@ -1060,7 +1063,7 @@ local TooltipDataProvider do
     ---@param index number
     ---@param callback? TooltipDataProviderCallback
     ---@param skipCallbackWhenInstant? boolean
-    ---@return TooltipItem? itemData
+    ---@return TooltipItem|boolean|nil itemData
     function TooltipDataProvider:ScanMerchantItem(index, callback, skipCallbackWhenInstant)
         if type(callback) ~= "function" then
             callback = nil
@@ -1079,10 +1082,13 @@ local TooltipDataProvider do
             self:RegisterCallback(index, callback)
         end
         if isPending then
-            return
+            return true
         end
         self:SetPending(index)
-        local tooltipData = TooltipScanner:ScanMerchantItem(index)
+        local tooltipData, tooltipIsPending = TooltipScanner:ScanMerchantItem(index)
+        if tooltipIsPending then
+            return tooltipData
+        end
         if tooltipData == false then
             self:ClearPending(index)
         end
@@ -1194,7 +1200,7 @@ local UpdateMerchantItemButton do
     ---@field public isToyCollected? boolean
     ---@field public isLearnable? boolean
     ---@field public tooltipScannable? boolean
-    ---@field public tooltipData? TooltipItem
+    ---@field public tooltipData TooltipItem|true|nil
     ---@field public canLearn? boolean
     ---@field public canLearnRequirement? ItemRequirement
     ---@field public isLearned? boolean
@@ -1281,7 +1287,7 @@ local UpdateMerchantItemButton do
                 return true
             end
         end
-        if self.tooltipScannable and self.tooltipData == nil then
+        if self.tooltipScannable and (self.tooltipData == nil or self.tooltipData == true) then
             return true
         end
         return false
@@ -1374,44 +1380,41 @@ local UpdateMerchantItemButton do
         if not self.tooltipScannable then
             return
         end
-        local tooltipData = self.tooltipData
-        if tooltipData == true then
+        if self.tooltipData == true then
             return
         end
         local function ProcessTooltipData()
+            local tooltipData = self.tooltipData
             if not tooltipData or tooltipData == true then
                 return
             end
-            if self.isLearnable then
-                if self.canLearn == nil then
-                    self.canLearn,
-                    self.canLearnRequirement = tooltipData:CanLearn()
-                end
-                if self.isLearned == nil then
-                    self.isLearned = tooltipData:IsLearned()
-                end
-                if self.isCollected == nil then
-                    self.isCollected,
-                    self.isCollectedNum,
-                    self.isCollectedNumMax = tooltipData:IsCollected()
-                end
+            if not self.isLearnable then
+                return
+            end
+            if self.canLearn == nil then
+                self.canLearn,
+                self.canLearnRequirement = tooltipData:CanLearn()
+            end
+            if self.isLearned == nil then
+                self.isLearned = tooltipData:IsLearned()
+            end
+            if self.isCollected == nil then
+                self.isCollected,
+                self.isCollectedNum,
+                self.isCollectedNumMax = tooltipData:IsCollected()
             end
         end
-        if tooltipData ~= nil then
+        if self.tooltipData then
             ProcessTooltipData()
             return
         end
         ---@param data TooltipItem
         local function HandleTooltipData(data)
-            tooltipData = data
             self.tooltipData = data
             ProcessTooltipData()
         end
-        tooltipData = TooltipDataProvider:ScanHyperlink(self.itemLinkOrID, HandleTooltipData, true)
-        -- tooltipData = TooltipDataProvider:ScanMerchantItem(index, HandleTooltipData, true) -- TODO: WIP
-        if tooltipData ~= nil then
-            HandleTooltipData(tooltipData)
-        end
+        self.tooltipData = TooltipDataProvider:ScanHyperlink(self.itemLinkOrID, HandleTooltipData)
+        -- self.tooltipData = TooltipDataProvider:ScanMerchantItem(index, HandleTooltipData) -- TODO: WIP
     end
 
     ---@return number index
@@ -1832,23 +1835,40 @@ local MerchantScanner do
         end)
     end
 
-    local throttleHandle
+    local throttleHandleFullUpdate
+    local throttleHandlePartialUpdate
 
-    local function throttleHandleClear()
-        if not throttleHandle then
+    local function throttleHandleFullClear()
+        if not throttleHandleFullUpdate then
             return
         end
-        throttleHandle:Cancel()
-        throttleHandle = nil
+        throttleHandleFullUpdate:Cancel()
+        throttleHandleFullUpdate = nil
+    end
+
+    local function throttleHandlePartialClear()
+        if not throttleHandlePartialUpdate then
+            return
+        end
+        throttleHandlePartialUpdate:Cancel()
+        throttleHandlePartialUpdate = nil
+    end
+
+    function MerchantScanner:UpdateMerchantThrottled()
+        throttleHandleFullClear()
+        throttleHandleFullUpdate = C_Timer.NewTicker(self.ITEM_REFRESH_INTERVAL, function()
+            throttleHandleFullClear()
+            self:UpdateMerchant()
+        end)
     end
 
     ---@param itemID number
     ---@param checkCostItems? boolean
     ---@param includePending? boolean
     function MerchantScanner:UpdateMerchantItemByIDThrottled(itemID, checkCostItems, includePending)
-        throttleHandleClear()
-        throttleHandle = C_Timer.NewTicker(self.ITEM_REFRESH_INTERVAL, function()
-            throttleHandleClear()
+        throttleHandlePartialClear()
+        throttleHandlePartialUpdate = C_Timer.NewTicker(self.ITEM_REFRESH_INTERVAL, function()
+            throttleHandlePartialClear()
             self:UpdateMerchantItemByID(itemID, checkCostItems, includePending)
         end)
     end
@@ -1895,8 +1915,8 @@ local MerchantScanner do
         "MERCHANT_UPDATE",
         "MERCHANT_FILTER_ITEM_UPDATE",
         "HEIRLOOMS_UPDATED",
-        "GET_ITEM_INFO_RECEIVED",
-        "ITEM_DATA_LOAD_RESULT",
+        -- "GET_ITEM_INFO_RECEIVED",
+        -- "ITEM_DATA_LOAD_RESULT",
     }
 
     ---@param event WowEvent
@@ -1904,29 +1924,29 @@ local MerchantScanner do
     function MerchantScanner:OnEvent(event, ...)
         if event == "MERCHANT_SHOW" then
             FrameUtil.RegisterFrameForEvents(self, self.Events)
-            MerchantScanner:UpdateMerchant(true)
+            self:UpdateMerchant(true)
         elseif event == "MERCHANT_CLOSED" then
             FrameUtil.UnregisterFrameForEvents(self, self.Events)
-            MerchantScanner:UpdateMerchant()
+            self:UpdateMerchant()
         elseif event == "UNIT_INVENTORY_CHANGED" then
             local unit = ...
             if unit == "player" then
-                MerchantScanner:UpdateMerchant()
+                self:UpdateMerchant()
             end
         elseif event == "MERCHANT_UPDATE" then
-            MerchantScanner:UpdateMerchant()
+            self:UpdateMerchantThrottled()
         elseif event == "MERCHANT_FILTER_ITEM_UPDATE" then
             local itemID = ...
-            MerchantScanner:UpdateMerchantItemByID(itemID)
+            self:UpdateMerchantItemByID(itemID)
         elseif event == "HEIRLOOMS_UPDATED" then
             local itemID, updateReason = ...
             if itemID and updateReason == "NEW" then
-                MerchantScanner:UpdateMerchantItemByID(itemID)
+                self:UpdateMerchantItemByID(itemID)
             end
         elseif event == "GET_ITEM_INFO_RECEIVED" or event == "ITEM_DATA_LOAD_RESULT" then
             local itemID, success = ...
             if success then
-                MerchantScanner:UpdateMerchantItemByIDThrottled(itemID, true, true)
+                self:UpdateMerchantItemByIDThrottled(itemID, true, true)
             end
         end
     end
