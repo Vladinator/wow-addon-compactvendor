@@ -126,7 +126,7 @@
     <Frame name="CompactVendorFrameMerchantIconTemplate" mixin="CompactVendorFrameMerchantIconTemplate, CompactVendorFrameAutoSizeTemplate" virtual="true">
         <Size x="24" y="24" />
         <Layers>
-            <Layer level="BORDER">
+            <Layer level="ARTWORK">
                 <Texture parentKey="Texture">
                     <Size x="20" y="20" />
                     <Anchors>
@@ -143,7 +143,7 @@
                     </MaskedTextures>
                 </MaskTexture>
             </Layer>
-            <Layer level="ARTWORK">
+            <Layer level="BORDER">
                 <Texture parentKey="Border" file="Interface\Minimap\MiniMap-TrackingBorder" desaturated="true">
                     <Size x="22" y="22" />
                     <Anchors>

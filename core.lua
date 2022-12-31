@@ -39,12 +39,19 @@ local LibItemSearch = LibStub("ItemSearch-1.3", true)
 local addonName, ---@type string CompactVendor
     ns = ... ---@class CompactVendorNS
 
-local CompactVendorDBDefaults
+local CompactVendorDBDefaults ---@class CompactVendorDBDefaults
 local ListItemScaleToFontObject
-local GetListItemScaleFontObject do
+local GetListItemScaleFontObject
+local GetIconShape do
 
+    ---@class CompactVendorDBDefaults
+    ---@field public ListItemScale number
+    ---@field public IconShape IconShape
+
+    ---@class CompactVendorDBDefaults
     CompactVendorDBDefaults = {
         ListItemScale = 13,
+        IconShape = 1,
     }
 
     local ListItemScaleFallbackFontObject = "CompactVendorFrameFont1"
@@ -101,6 +108,14 @@ local GetListItemScaleFontObject do
             end
         end
         return ListItemScaleFallbackFontObject, ListItemScaleFallbackFontSize, false, ListItemScaleFallbackFontSize, true
+    end
+
+    function GetIconShape()
+        local shape = CompactVendorDB.IconShape ---@type IconShape?
+        if type(shape) ~= "number" or shape < 0 or shape > 5 then
+            shape = CompactVendorDBDefaults.IconShape
+        end
+        return shape
     end
 
 end
@@ -1674,6 +1689,7 @@ local MerchantScanner do
 
     MerchantScanner.collection = {}
 
+    MerchantScanner.MERCHANT_REFRESH_INTERVAL = 0.25
     MerchantScanner.ITEM_REFRESH_INTERVAL = 0.25
 
     ---@alias ObjectPoolObject any
@@ -1857,11 +1873,19 @@ local MerchantScanner do
         throttleHandlePartialUpdate = nil
     end
 
-    function MerchantScanner:UpdateMerchantThrottled()
+    local function TimerSafeUpdateMerchant()
+        MerchantScanner:UpdateMerchant()
+    end
+
+    ---@param useAdditionalDelayedUpdate? boolean
+    function MerchantScanner:UpdateMerchantThrottled(useAdditionalDelayedUpdate)
         throttleHandleFullClear()
-        throttleHandleFullUpdate = C_Timer.NewTicker(self.ITEM_REFRESH_INTERVAL, function()
+        throttleHandleFullUpdate = C_Timer.NewTicker(self.MERCHANT_REFRESH_INTERVAL, function()
             throttleHandleFullClear()
             self:UpdateMerchant()
+            if useAdditionalDelayedUpdate then
+                C_Timer.After(self.MERCHANT_REFRESH_INTERVAL, TimerSafeUpdateMerchant)
+            end
         end)
     end
 
@@ -1937,7 +1961,7 @@ local MerchantScanner do
                 self:UpdateMerchant()
             end
         elseif event == "MERCHANT_UPDATE" then
-            self:UpdateMerchantThrottled()
+            self:UpdateMerchantThrottled(true)
         elseif event == "MERCHANT_FILTER_ITEM_UPDATE" then
             local itemID = ...
             self:UpdateMerchantItemByID(itemID)
@@ -2454,12 +2478,18 @@ local Frame do
 
         local panel = CreateFrame("Frame")
 
-        do
+        ---@param name string
+        ---@param variable string
+        ---@param currentValue number
+        ---@param minValue number
+        ---@param maxValue number
+        ---@param step number
+        ---@param labelFunc? fun(value: number): string
+        local function CreateSlider(name, variable, currentValue, minValue, maxValue, step, labelFunc)
 
-            local name = "Text size (px)"
-            local variable = "ListItemScale"
-            local currentValue = CompactVendorDB[variable]
-            local minValue, maxValue, step = ListItemScaleToFontObject.minSize, ListItemScaleToFontObject.maxSize, 1
+            if not labelFunc then
+                labelFunc = tostring
+            end
 
             ---@type SettingsAdvancedSliderTemplate
             local control = CreateFrame("Frame", nil, panel, "SettingsAdvancedSliderTemplate") ---@diagnostic disable-line: assign-type-mismatch
@@ -2468,13 +2498,48 @@ local Frame do
             control.Text:SetText(name)
 
             control.SliderWithSteppers:Init(currentValue, minValue, maxValue, (maxValue - minValue) * step, {
-                [MinimalSliderWithSteppersMixin.Label.Right] = function(value) return tostring(value) end,
+                [MinimalSliderWithSteppersMixin.Label.Right] = function(value) return labelFunc(value) end,
             })
 
             control.SliderWithSteppers:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, value)
                 currentValue = value
                 CompactVendorDB[variable] = value
             end)
+
+            return control
+
+        end
+
+        do
+
+            local name = "Text size (px)"
+            local variable = "ListItemScale"
+            local currentValue = CompactVendorDB[variable]
+            local minValue, maxValue, step = ListItemScaleToFontObject.minSize, ListItemScaleToFontObject.maxSize, 1
+
+            local control = CreateSlider(name, variable, currentValue, minValue, maxValue, step)
+            control:SetPoint("TOPLEFT", 0, 0)
+
+        end
+
+        do
+
+            local name = "Icon shape"
+            local variable = "IconShape"
+            local currentValue = CompactVendorDB[variable]
+            local minValue, maxValue, step = 0, 5, 1
+
+            local IconShapeLabel = {
+                [0] = "None",
+                [1] = "Round",
+                [2] = "Square",
+                [3] = "Diamond",
+                [4] = "Hexagon",
+                [5] = "Octagon",
+            }
+
+            local control = CreateSlider(name, variable, currentValue, minValue, maxValue, step, function(value) return IconShapeLabel[value] end)
+            control:SetPoint("TOPLEFT", 0, -32)
 
         end
 
@@ -2887,7 +2952,7 @@ local CompactVendorFrameMerchantIconTemplate do
     ---@field public file number|string
     ---@field public size number
     ---@field public anchor AnchorPoint
-    ---@field public texCoords? number[]
+    ---@field public texCoords? number[]|false
     ---@field public mask string|number
     ---@field public maskSize number
     ---@field public maskAnchor AnchorPoint
@@ -2903,17 +2968,17 @@ local CompactVendorFrameMerchantIconTemplate do
             size = 20,
             anchor = { "LEFT", 4, 0 },
             mask = TextureHiddenFileID,
-            maskSize = 16,
-            maskAnchor = { "LEFT", 6, 0 },
+            maskSize = 18,
+            maskAnchor = { "CENTER", "$parent.Texture", "CENTER" },
         },
         border = {
             file = TextureHiddenFileID,
             size = 22,
             anchor = { "CENTER", "$parent.Texture", "CENTER" },
-            texCoords = { 0.046875, 0.578125, 0.03125, 0.578125 },
+            texCoords = false,
             mask = TextureHiddenFileID,
             maskSize = 20,
-            maskAnchor = { "LEFT", 4, 0 },
+            maskAnchor = { "CENTER", "$parent.Texture", "CENTER" },
         },
     }
 
@@ -2934,13 +2999,22 @@ local CompactVendorFrameMerchantIconTemplate do
         [IconShape.Round] = InheritFromBase({
             icon = {
                 mask = 130924,
+                maskSize = 16,
+                maskAnchor = { "LEFT", 6, 0 },
             },
             border = {
                 file = "Interface\\Minimap\\MiniMap-TrackingBorder",
+                texCoords = { 0.046875, 0.578125, 0.03125, 0.578125 },
+                mask = 130924,
+                maskAnchor = { "LEFT", 4, 0 },
             },
         }),
         [IconShape.Square] = InheritFromBase({
             icon = {
+                mask = 2443038,
+            },
+            border = {
+                file = 2443038,
                 mask = 2443038,
             },
         }),
@@ -2948,14 +3022,26 @@ local CompactVendorFrameMerchantIconTemplate do
             icon = {
                 mask = 3152572,
             },
+            border = {
+                file = 3152572,
+                mask = 3152572,
+            },
         }),
         [IconShape.Hexagon] = InheritFromBase({
             icon = {
                 mask = 426723,
             },
+            border = {
+                file = 426723,
+                mask = 426723,
+            },
         }),
         [IconShape.Octagon] = InheritFromBase({
             icon = {
+                mask = 3750798,
+            },
+            border = {
+                file = 3750798,
                 mask = 3750798,
             },
         }),
@@ -2978,8 +3064,12 @@ local CompactVendorFrameMerchantIconTemplate do
     local function SetShape(info, texture, textureMask, isBorder)
         local invisibleTexture = info.file == TextureHiddenFileID
         local invisibleTextureMask = info.mask == TextureHiddenFileID
-        texture:SetShown(not invisibleTexture)
-        textureMask:SetShown(not invisibleTextureMask)
+        if invisibleTexture then
+            texture:Hide()
+        end
+        if invisibleTextureMask then
+            textureMask:Hide()
+        end
         if isBorder then
             texture:SetTexture(info.file)
             texture:SetDesaturated(true)
@@ -3402,7 +3492,7 @@ local CompactVendorFrameMerchantButtonTemplate do
     function CompactVendorFrameMerchantButtonTemplate:OnShow()
         UpdateMerchantItemButton(self, self.merchantItem)
         self:UpdateTextSize()
-        -- self:UpdateIconMask() -- TODO: WIP
+        self:UpdateIconShape()
     end
 
     function CompactVendorFrameMerchantButtonTemplate:OnHide()
@@ -3557,8 +3647,8 @@ local CompactVendorFrameMerchantButtonTemplate do
         self.Cost:AutoSize()
     end
 
-    function CompactVendorFrameMerchantButtonTemplate:UpdateIconMask()
-        local shape = 1 -- TODO: WIP
+    function CompactVendorFrameMerchantButtonTemplate:UpdateIconShape()
+        local shape = GetIconShape()
         self.Icon:SetShape(shape)
         for _, cost in pairs(self.Cost.Costs) do
             cost.Icon:SetShape(shape)
