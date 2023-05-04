@@ -767,6 +767,9 @@ local TooltipScanner do
     ---@return boolean? isPending
     local function IsPending(rawData)
         local args = rawData.lines[1].args
+        if not args then
+            return
+        end
         for _, arg in ipairs(args) do
             if arg.field == "leftText" then
                 return IsTooltipTextPending(arg.stringVal)
