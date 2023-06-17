@@ -466,6 +466,7 @@ local IsTooltipTextPending do
         Price = 11,
         Embed = 19,
         Bonding = 20,
+        Known = 26,
     }
 
     ---@class TooltipItemLine : TooltipDataLineArgs
@@ -476,7 +477,8 @@ local IsTooltipTextPending do
     end
 
     function TooltipItemLine:IsTypeText()
-        return self:GetType() == TooltipDataLineArgsType.Text
+        local type = self:GetType()
+        return type == TooltipDataLineArgsType.Text or type == TooltipDataLineArgsType.Known
     end
 
     function TooltipItemLine:IsTypePadding()
@@ -2652,11 +2654,12 @@ local CompactVendorFrameAutoSizeTemplate do
             return
         end
         if self.isIconTextTemplate then
-            ---@diagnostic disable-next-line: assign-type-mismatch
-            local cost = self ---@type CompactVendorFrameMerchantIconTemplate
-            if cost and cost.Texture and not cost.mode then
-                width = width - (cost.Texture:IsShown() and cost.Texture:GetWidth() or 0)
-            end
+            -- ---@diagnostic disable-next-line: assign-type-mismatch
+            -- local cost = self ---@type CompactVendorFrameMerchantIconTemplate
+            -- if cost and cost.Texture and not cost.mode then
+            --     width = width - (cost.Texture:IsShown() and cost.Texture:GetWidth() or 0)
+            -- end
+            width = 24 -- TODO: 10.1 changed something that causes this to align the Icon in a weird way when we autosize so when we encounter this template we force it to the square dimension size
         end
         self:SetWidth(width)
     end
