@@ -989,7 +989,7 @@ local TooltipScanner do
             name, _, quality = GetItemInfo(hyperlink)
         end
         if not name then
-            name = ""
+            name = RETRIEVING_ITEM_INFO
         end
         if not quality then
             quality = 1
