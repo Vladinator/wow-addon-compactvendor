@@ -403,7 +403,7 @@ local IsTransmogCollected do
         if type(itemLink) ~= "string" then
             return
         end
-        if not C_Transmog.CanTransmogItem(itemLink) then
+        if not C_Transmog or not C_Transmog.CanTransmogItem(itemLink) then
             return false
         end
         local _, sourceID = C_TransmogCollection.GetItemInfo(itemLink)
@@ -782,6 +782,9 @@ local TooltipScanner do
     ---@param itemData TooltipItem
     ---@return TooltipItem? itemData, boolean isPending, boolean? isPendingThrottled
     function TooltipScanner:Refresh(itemData)
+        if not C_TooltipInfo then
+            return nil, false, false
+        end
         local hyperlinkOrIndex, optionalArg1, optionalArg2, hideVendorPrice, lastCalled = itemData:GetCallArgs()
         local now = GetTime()
         if now - lastCalled < self.TOOLTIP_REFRESH_INTERVAL then
@@ -888,6 +891,9 @@ local TooltipScanner do
     ---@param hideVendorPrice? boolean
     ---@return TooltipItem|false tooltipData, boolean isPending
     function TooltipScanner:ScanHyperlink(hyperlinkOrItemID, optionalArg1, optionalArg2, hideVendorPrice)
+        if not C_TooltipInfo then
+            return false, false
+        end
         local hyperlink = self:SanitizeHyperlink(hyperlinkOrItemID)
         if not hyperlink then
             return false, false
@@ -914,6 +920,9 @@ local TooltipScanner do
     ---@param index number
     ---@return TooltipItem|false tooltipData, boolean isPending
     function TooltipScanner:ScanMerchantItem(index)
+        if not C_TooltipInfo then
+            return false, false
+        end
         local tooltipData = C_TooltipInfo.GetMerchantItem(index)
         if not tooltipData then
             return false, false
@@ -1334,9 +1343,9 @@ local UpdateMerchantItemButton do
         self.itemLink = GetMerchantItemLink(index)---@diagnostic disable-line: assign-type-mismatch
         self.merchantItemID = GetMerchantItemID(index)---@diagnostic disable-line: assign-type-mismatch
         self.itemLinkOrID = self.itemLink or self.merchantItemID
-        self.isHeirloom = self.merchantItemID and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
-        self.isKnownHeirloom = self.isHeirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
-        self.showNonrefundablePrompt = not C_MerchantFrame.IsMerchantItemRefundable(index)
+        self.isHeirloom = self.merchantItemID and C_Heirloom and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
+        self.isKnownHeirloom = self.isHeirloom and C_Heirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
+        self.showNonrefundablePrompt = C_MerchantFrame.IsMerchantItemRefundable and not C_MerchantFrame.IsMerchantItemRefundable(index)
         self.tintRed = not self.isPurchasable or (not self.isUsable and not self.isHeirloom)
         if self.numAvailable == 0 or self.isKnownHeirloom then
             if self.tintRed then
@@ -1389,11 +1398,11 @@ local UpdateMerchantItemButton do
         self.itemClassID,
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
-        self.isTransmog = C_Transmog.CanTransmogItem(self.itemLinkOrID) ---@diagnostic disable-line: param-type-mismatch
+        self.isTransmog = C_Transmog and C_Transmog.CanTransmogItem(self.itemLinkOrID) ---@diagnostic disable-line: param-type-mismatch
         self.isTransmogCollectable,
         self.isTransmogCollected = IsTransmogCollected(self.itemLink)
-        self.isCosmetic = IsCosmeticItem(self.itemLinkOrID)
-        self.isToy = self.merchantItemID and C_ToyBox.GetToyInfo(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
+        self.isCosmetic = IsCosmeticItem and IsCosmeticItem(self.itemLinkOrID)
+        self.isToy = self.merchantItemID and C_ToyBox and C_ToyBox.GetToyInfo(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
         self.isToyCollected = self.merchantItemID and PlayerHasToy(self.merchantItemID)
         self.isLearnable = self.isCosmetic or self:IsLearnable()
         self.tooltipScannable = self.isLearnable
@@ -1935,12 +1944,16 @@ local MerchantScanner do
         end
     end
 
-    local function UpdateMerchant()
-        MerchantScanner:UpdateMerchant(true)
-    end
+    if SetMerchantFilter then
 
-    hooksecurefunc("SetMerchantFilter", UpdateMerchant)
-    hooksecurefunc("ResetSetMerchantFilter", UpdateMerchant)
+        local function UpdateMerchant()
+            MerchantScanner:UpdateMerchant(true)
+        end
+
+        hooksecurefunc("SetMerchantFilter", UpdateMerchant)
+        hooksecurefunc("ResetSetMerchantFilter", UpdateMerchant)
+
+    end
 
     ---@type WowEvent[]
     MerchantScanner.Events = {
