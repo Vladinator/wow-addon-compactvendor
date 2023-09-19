@@ -16,6 +16,7 @@ local StaticPopup_Visible = StaticPopup_Visible ---@type fun(name: string): any,
 local CreateObjectPool = CreateObjectPool ---@type ObjectPoolFunction
 local CreateFramePool = CreateFramePool ---@type FramePoolFunction
 local IsCosmeticItem = IsCosmeticItem ---@type fun(item: string|number): boolean
+local GetCurrencyInfo = GetCurrencyInfo ---@type fun(item: string|number): string?, number, string, number, number, number, boolean, number
 local CallbackRegistryMixin = CallbackRegistryMixin ---@type CallbackRegistry
 local FrameUtil = FrameUtil ---@type table<any, any>
 local MathUtil = MathUtil ---@type table<any, any>
@@ -195,9 +196,9 @@ local ConvertToPattern do
 
         if not r or not g or not b then
 
-            r = tonumber(hex:sub(3, 4), 16)
-            g = tonumber(hex:sub(5, 6), 16)
-            b = tonumber(hex:sub(7, 8), 16)
+            r = tonumber(hex:sub(3, 4), 16) ---@diagnostic disable-line: param-type-mismatch
+            g = tonumber(hex:sub(5, 6), 16) ---@diagnostic disable-line: param-type-mismatch
+            b = tonumber(hex:sub(7, 8), 16) ---@diagnostic disable-line: param-type-mismatch
 
             if r and g and b then
 
@@ -219,7 +220,7 @@ local ConvertToPattern do
 
         local index = #ItemQualityColorToHexColor + 1
         ItemQualityColorToHexColor[index] = color
-        ItemHexColorToQualityIndex[key] = color
+        ItemHexColorToQualityIndex[key] = color ---@diagnostic disable-line: assign-type-mismatch
         ItemHexColorToQualityIndex[color.hex] = index
         ColorPreset[key] = color
         ColorPreset[index] = color
@@ -782,22 +783,23 @@ local TooltipScanner do
     ---@param itemData TooltipItem
     ---@return TooltipItem? itemData, boolean isPending, boolean? isPendingThrottled
     function TooltipScanner:Refresh(itemData)
-        if not C_TooltipInfo then
-            return nil, false, false
-        end
         local hyperlinkOrIndex, optionalArg1, optionalArg2, hideVendorPrice, lastCalled = itemData:GetCallArgs()
         local now = GetTime()
         if now - lastCalled < self.TOOLTIP_REFRESH_INTERVAL then
             return nil, true, true
         end
         ---@diagnostic disable-next-line: assign-type-mismatch
-        local hyperlink = type(hyperlinkOrIndex) == "string" and hyperlinkOrIndex or nil ---@type string|nil
-        local index = type(hyperlinkOrIndex) == "number" and hyperlinkOrIndex or nil ---@type number|nil
-        local tooltipData
-        if hyperlink then
-            tooltipData = C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
-        elseif index then
-            tooltipData = C_TooltipInfo.GetMerchantItem(index)
+        local hyperlink = type(hyperlinkOrIndex) == "string" and hyperlinkOrIndex or nil ---@type string?
+        local index = type(hyperlinkOrIndex) == "number" and hyperlinkOrIndex or nil ---@type number?
+        local tooltipData ---@type TooltipData?
+        if C_TooltipInfo then
+            if hyperlink then
+                tooltipData = C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+            elseif index then
+                tooltipData = C_TooltipInfo.GetMerchantItem(index)
+            end
+        elseif hyperlink or index then
+            tooltipData = self:LegacyGetTooltipData(hyperlink or GetMerchantItemLink(index))
         end
         if not tooltipData or IsPending(tooltipData) then
             return nil, true
@@ -863,9 +865,11 @@ local TooltipScanner do
     ---@param hideVendorPrice? boolean
     ---@return TooltipItem itemData
     function TooltipScanner:ConvertToTooltipItem(tooltipData, hyperlinkOrIndex, optionalArg1, optionalArg2, hideVendorPrice)
-        TooltipUtil.SurfaceArgs(tooltipData)
-        for _, line in ipairs(tooltipData.lines) do
-            TooltipUtil.SurfaceArgs(line)
+        if TooltipUtil then
+            TooltipUtil.SurfaceArgs(tooltipData)
+            for _, line in ipairs(tooltipData.lines) do
+                TooltipUtil.SurfaceArgs(line)
+            end
         end
         ---@type TooltipDataArgs
         local tooltipDataArgs = tooltipData ---@diagnostic disable-line: assign-type-mismatch
@@ -891,9 +895,6 @@ local TooltipScanner do
     ---@param hideVendorPrice? boolean
     ---@return TooltipItem|false tooltipData, boolean isPending
     function TooltipScanner:ScanHyperlink(hyperlinkOrItemID, optionalArg1, optionalArg2, hideVendorPrice)
-        if not C_TooltipInfo then
-            return false, false
-        end
         local hyperlink = self:SanitizeHyperlink(hyperlinkOrItemID)
         if not hyperlink then
             return false, false
@@ -902,7 +903,12 @@ local TooltipScanner do
         if not itemID then
             return false, false
         end
-        local tooltipData = C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+        local tooltipData
+        if C_TooltipInfo then
+            tooltipData = C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+        else
+            tooltipData = self:LegacyGetTooltipData(hyperlink)
+        end
         if not tooltipData then
             return false, false
         end
@@ -920,10 +926,12 @@ local TooltipScanner do
     ---@param index number
     ---@return TooltipItem|false tooltipData, boolean isPending
     function TooltipScanner:ScanMerchantItem(index)
-        if not C_TooltipInfo then
-            return false, false
+        local tooltipData
+        if C_TooltipInfo then
+            tooltipData = C_TooltipInfo.GetMerchantItem(index)
+        else
+            tooltipData = self:LegacyGetTooltipData(GetMerchantItemLink(index))
         end
-        local tooltipData = C_TooltipInfo.GetMerchantItem(index)
         if not tooltipData then
             return false, false
         end
@@ -945,6 +953,62 @@ local TooltipScanner do
     end
 
     TooltipScanner:SetScript("OnEvent", TooltipScanner.OnEvent)
+
+    ---@type ColorMixin
+    local WhiteColor = GetColorFromQuality(1) ---@diagnostic disable-line: assign-type-mismatch
+
+    local function CreateTooltipDataLineObject()
+        ---@type TooltipDataLine
+        return {
+            type = 0,
+            wrapText = false,
+            leftText = "",
+            leftColor = WhiteColor,
+            rightText = "",
+            rightColor = WhiteColor,
+        }
+    end
+
+    local function CreateTooltipDataObject()
+        ---@type TooltipData
+        return {
+            dataInstanceID = 0,
+            ---@type TooltipDataLine[]
+            lines = {
+                CreateTooltipDataLineObject(),
+            },
+        }
+    end
+
+    ---@param line TooltipDataLine
+    ---@param hyperlink? string
+    ---@return boolean isItemLoaded
+    local function SafelySetTooltipDataLine(line, hyperlink)
+        local _, name, quality
+        if hyperlink then
+            name, _, quality = GetItemInfo(hyperlink)
+        end
+        if not name then
+            name = ""
+        end
+        if not quality then
+            quality = 1
+        end
+        line.leftText = name
+        if quality ~= 1 then
+            line.leftColor = GetColorFromQuality(quality) ---@diagnostic disable-line: assign-type-mismatch
+        end
+        return name ~= ""
+    end
+
+    ---@param hyperlink? string
+    ---@return TooltipData? tooltipData
+    function TooltipScanner:LegacyGetTooltipData(hyperlink)
+        local tooltipData = CreateTooltipDataObject()
+        local nameLine = tooltipData.lines[1] ---@type TooltipDataLine
+        SafelySetTooltipDataLine(nameLine, hyperlink)
+        return tooltipData
+    end
 
 end
 
@@ -1362,6 +1426,7 @@ local UpdateMerchantItemButton do
         for i = 1, self.extendedCostCount do
             local costItem = self.extendedCostItems[i]
             if not costItem then
+                ---@diagnostic disable-next-line: missing-fields
                 costItem = {} ---@type MerchantItemCostItem
                 self.extendedCostItems[i] = costItem
             end
@@ -2186,7 +2251,7 @@ local Frame do
         ---@field public clearButton Button
 
         ---@diagnostic disable-next-line: assign-type-mismatch
-        self.Search = CreateFrame("EditBox", nil, self, "SearchBoxTemplate") ---@type CompactVendorFrameSearchBox
+        self.Search = CreateFrame("EditBox", nil, self, "SearchBoxTemplate") ---@class CompactVendorFrameSearchBox
         self.Search:SetSize(102, 32)
         self.Search:SetMultiLine(false)
         self.Search:SetMaxLetters(255)
@@ -2407,7 +2472,7 @@ local Frame do
         self.ScrollBox = CreateFrame("Frame", nil, self, "WowScrollBoxList") ---@class CompactVendorFrameScrollBox
         self.ScrollBox:SetSize(466, 386)
         self.ScrollBox:SetPoint("TOPLEFT", 7, -64)
-        self.ScrollBox:SetAllPoints()
+        self.ScrollBox:SetAllPoints() ---@diagnostic disable-line: missing-parameter
 
         ---@class EventFrame : Frame
         ---@field public Event table<"OnHide"|"OnShow"|"OnSizeChanged", number>
@@ -2418,7 +2483,7 @@ local Frame do
 
         ---@class WowTrimScrollBar : Frame
         ---@field public minThumbExtent number 23
-        ---@field public Backplate Texture
+        ---@field public Backplate TextureBase
         ---@field public Background Frame
         ---@field public Track Frame
         ---@field public Back Button
@@ -2472,10 +2537,10 @@ local Frame do
 
         ---@class MinimalSliderTemplate : Slider
         ---@field public obeyStepOnDrag boolean
-        ---@field public Left Texture
-        ---@field public Right Texture
-        ---@field public Middle Texture
-        ---@field public Thumb Texture # ThumbTexture
+        ---@field public Left TextureBase
+        ---@field public Right TextureBase
+        ---@field public Middle TextureBase
+        ---@field public Thumb TextureBase # ThumbTexture
 
         ---@class MinimalSliderWithSteppersTemplate : Frame
         ---@field public Slider MinimalSliderTemplate
@@ -2661,7 +2726,7 @@ local CompactVendorFrameAutoSizeTemplate do
     function CompactVendorFrameAutoSizeTemplate:AutoSize()
         self:Show()
         self:SetWidth(1)
-        AutoSize({ self:GetChildren() })
+        AutoSize({ self:GetChildren() }) ---@diagnostic disable-line: assign-type-mismatch
         local _, _, width = self:GetBoundsRect()
         if not width then
             return
@@ -2684,8 +2749,8 @@ local CompactVendorFrameMerchantStackSplitTemplate do
 
     ---@class CompactVendorFrameMerchantStackSplitTemplate : Frame
     ---@field public owner? CompactVendorFrameMerchantButtonQuantityTemplate
-    ---@field public SingleItemSplitBackground Texture
-    ---@field public MultiItemSplitBackground Texture
+    ---@field public SingleItemSplitBackground TextureBase
+    ---@field public MultiItemSplitBackground TextureBase
     ---@field public StackSplitText FontString
     ---@field public StackItemCountText FontString
     ---@field public LeftButton Button
@@ -2704,7 +2769,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
         self.typing = 0
         self.split = 0
         self:Hide()
-        self:SetParent(UIParent)
+        self:SetParent(UIParent) ---@diagnostic disable-line: param-type-mismatch
         self:SetFrameStrata("HIGH")
         self:SetClampedToScreen(true)
         self:SetToplevel(true)
@@ -2835,7 +2900,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
         self.minSplit = stackCount or 1
         self.split = self.minSplit
         self.typing = 0
-        self.StackSplitText:SetText(self.split)
+        self.StackSplitText:SetText(self.split) ---@diagnostic disable-line: param-type-mismatch
         self.LeftButton:Disable()
         self.RightButton:Enable()
         self:ClearAllPoints()
@@ -2879,7 +2944,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
             self.StackSplitText:SetText(STACKS:format(self.split/self.minSplit))
             self.StackItemCountText:SetText(TOTAL_STACKS:format(self.split))
         else
-            self.StackSplitText:SetText(self.split)
+            self.StackSplitText:SetText(self.split) ---@diagnostic disable-line: param-type-mismatch
         end
     end
 
@@ -2895,7 +2960,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
         end
         if self.split > self.maxStack then
             self.split = self.maxStack
-            self.StackSplitText:SetText(self.split)
+            self.StackSplitText:SetText(self.split) ---@diagnostic disable-line: param-type-mismatch
         end
         self.RightButton:SetEnabled(self.split ~= self.maxStack)
         self.LeftButton:SetEnabled(self.split ~= 1)
@@ -2907,7 +2972,7 @@ end
 local CompactVendorFrameMerchantButtonQuantityTemplate do
 
     ---@class CompactVendorFrameMerchantButtonQuantityTemplate : Button
-    ---@field public Bg Texture
+    ---@field public Bg TextureBase
     ---@field public Name FontString
     ---@field public StackSplitFrameOwnedBy? CompactVendorFrameMerchantButtonTemplate
 
@@ -2920,8 +2985,8 @@ local CompactVendorFrameMerchantButtonQuantityTemplate do
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnLoad()
         self:RegisterForClicks("LeftButtonUp")
-        self:GetNormalTexture():SetTexCoord(0.15625, 0.5, 0.84375, 0.5, 0.15625, 0, 0.84375, 0)
-        self:GetHighlightTexture():SetTexCoord(0.15625, 1, 0.84375, 1, 0.15625, 0.5, 0.84375, 0.5)
+        self:GetNormalTexture():SetTexCoord(0.15625, 0.5, 0.84375, 0.5, 0.15625, 0, 0.84375, 0) ---@diagnostic disable-line: undefined-field
+        self:GetHighlightTexture():SetTexCoord(0.15625, 1, 0.84375, 1, 0.15625, 0.5, 0.84375, 0.5) ---@diagnostic disable-line: undefined-field
         -- required by StackSplitFrame
         self.hasStackSplit = 0
         self.SplitStack = self.StackSplitFrameCallback
@@ -2967,14 +3032,16 @@ local CompactVendorFrameMerchantIconTemplate do
         Octagon = 5,
     }
 
+    ---@class IconShapeMaskAnchor : table
+
     ---@class IconShapeInfoItemData
     ---@field public file number|string
     ---@field public size number
-    ---@field public anchor AnchorPoint
+    ---@field public anchor IconShapeMaskAnchor
     ---@field public texCoords? number[]|false
     ---@field public mask string|number
     ---@field public maskSize number
-    ---@field public maskAnchor AnchorPoint
+    ---@field public maskAnchor IconShapeMaskAnchor
 
     ---@class IconShapeInfoItem
     ---@field public icon IconShapeInfoItemData
@@ -3013,15 +3080,15 @@ local CompactVendorFrameMerchantIconTemplate do
 
     ---@type IconShapeInfoItem[]
     local IconShapeInfo = {
-        [IconShape.None] = InheritFromBase({
+        [IconShape.None] = InheritFromBase({ ---@diagnostic disable-line: missing-fields
         }),
         [IconShape.Round] = InheritFromBase({
-            icon = {
+            icon = { ---@diagnostic disable-line: missing-fields
                 mask = 130924,
                 maskSize = 16,
                 maskAnchor = { "LEFT", 6, 0 },
             },
-            border = {
+            border = { ---@diagnostic disable-line: missing-fields
                 file = "Interface\\Minimap\\MiniMap-TrackingBorder",
                 texCoords = { 0.046875, 0.578125, 0.03125, 0.578125 },
                 mask = 130924,
@@ -3029,37 +3096,37 @@ local CompactVendorFrameMerchantIconTemplate do
             },
         }),
         [IconShape.Square] = InheritFromBase({
-            icon = {
+            icon = { ---@diagnostic disable-line: missing-fields
                 mask = 2443038,
             },
-            border = {
+            border = { ---@diagnostic disable-line: missing-fields
                 file = 2443038,
                 mask = 2443038,
             },
         }),
         [IconShape.Diamond] = InheritFromBase({
-            icon = {
+            icon = { ---@diagnostic disable-line: missing-fields
                 mask = 3152572,
             },
-            border = {
+            border = { ---@diagnostic disable-line: missing-fields
                 file = 3152572,
                 mask = 3152572,
             },
         }),
         [IconShape.Hexagon] = InheritFromBase({
-            icon = {
+            icon = { ---@diagnostic disable-line: missing-fields
                 mask = 426723,
             },
-            border = {
+            border = { ---@diagnostic disable-line: missing-fields
                 file = 426723,
                 mask = 426723,
             },
         }),
         [IconShape.Octagon] = InheritFromBase({
-            icon = {
+            icon = { ---@diagnostic disable-line: missing-fields
                 mask = 3750798,
             },
-            border = {
+            border = { ---@diagnostic disable-line: missing-fields
                 file = 3750798,
                 mask = 3750798,
             },
@@ -3067,7 +3134,7 @@ local CompactVendorFrameMerchantIconTemplate do
     }
 
     ---@param self Region
-    ---@param anchor AnchorPoint
+    ---@param anchor IconShapeMaskAnchor|AnchorPoint[]
     local function UnpackAnchorArgs(self, anchor)
         local anchor1, anchor2, anchor3, anchor4, anchor5 = unpack(anchor) ---@diagnostic disable-line: param-type-mismatch
         if anchor2 == "$parent.Texture" then
@@ -3077,8 +3144,8 @@ local CompactVendorFrameMerchantIconTemplate do
     end
 
     ---@param info IconShapeInfoItemData
-    ---@param texture Texture
-    ---@param textureMask Texture
+    ---@param texture TextureBase
+    ---@param textureMask TextureBase
     ---@param isBorder boolean?
     local function SetShape(info, texture, textureMask, isBorder)
         local invisibleTexture = info.file == TextureHiddenFileID
@@ -3108,10 +3175,10 @@ local CompactVendorFrameMerchantIconTemplate do
     end
 
     ---@class CompactVendorFrameMerchantIconTemplate : CompactVendorFrameAutoSizeTemplate
-    ---@field public Texture Texture
-    ---@field public TextureMask Texture #MaskTexture
-    ---@field public Border Texture
-    ---@field public BorderMask Texture #MaskTexture
+    ---@field public Texture TextureBase
+    ---@field public TextureMask TextureBase #MaskTexture
+    ---@field public Border TextureBase
+    ---@field public BorderMask TextureBase #MaskTexture
     ---@field public Count FontString
     ---@field public Text FontString
     ---@field public mode? boolean
@@ -3142,7 +3209,7 @@ local CompactVendorFrameMerchantIconTemplate do
 
     ---@param count? number|string
     function CompactVendorFrameMerchantIconTemplate:SetCount(count)
-        self.Count:SetText(count)
+        self.Count:SetText(count) ---@diagnostic disable-line: param-type-mismatch
     end
 
     ---@param merchantItem MerchantItem
@@ -3168,7 +3235,7 @@ local CompactVendorFrameMerchantIconTemplate do
 
     ---@param text? string|number
     function CompactVendorFrameMerchantIconTemplate:SetText(text)
-        self.Text:SetText(text or "")
+        self.Text:SetText(text or "") ---@diagnostic disable-line: param-type-mismatch
         self:SetMode(false)
     end
 
@@ -3495,7 +3562,7 @@ local CompactVendorFrameMerchantButtonTemplate do
     ---@field public backgroundColor? number[]
     ---@field public textColor? SimpleColor
     ---@field public hovering? boolean
-    ---@field public Bg Texture
+    ---@field public Bg TextureBase
     ---@field public Name FontString
     ---@field public Icon CompactVendorFrameMerchantIconTemplate
     ---@field public Quantity CompactVendorFrameMerchantButtonQuantityTemplate

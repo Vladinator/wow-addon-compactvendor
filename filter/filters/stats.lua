@@ -34,7 +34,7 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         for value, _ in pairs(values) do
             local option = self:GetOption(value)
             if not option then
-                option = {}
+                option = {} ---@diagnostic disable-line: missing-fields
                 options[#options + 1] = option
             end
             option.value = value

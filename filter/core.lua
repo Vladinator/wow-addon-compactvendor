@@ -1,3 +1,5 @@
+local CompactVendorFrame = CompactVendorFrame ---@type CompactVendorFrame
+
 ---@class DropdownInfoPolyfill
 ---@field public keepShownOnClick boolean?
 ---@field public isNotRadio boolean?
@@ -10,6 +12,8 @@
 ---@field public value any?
 ---@field public text string
 ---@field public func fun(self: Button, arg1: any?, arg2: any?, checked :boolean?, mouseButton: string?)
+---@field public arg1? any
+---@field public arg2? any
 
 local CloseDropDownMenus = CloseDropDownMenus ---@type fun(level?: number)
 local ToggleDropDownMenu = ToggleDropDownMenu ---@type fun(level?: number, value?: any, dropDownFrame?: Region, anchorName?: Region, xOffset?: number, yOffset?: number, menuList?: table, button?: string, autoHideDelay?: boolean)
@@ -79,14 +83,15 @@ local CompactVendorFilterFrameTemplate do
 
     function CompactVendorFilterFrameTemplate:OnLoad()
         self.MerchantDataProvider = CompactVendorFrame.ScrollBox:GetDataProvider()
-        self.Button = CompactVendorFilterButton
-        self:SetParent(self.Button)
+        self.Button = CompactVendorFilterButton ---@type CompactVendorFilterButtonTemplate
+        self:SetParent(self.Button) ---@diagnostic disable-line: param-type-mismatch
         self:SetFrameStrata("HIGH")
         self:SetToplevel(true)
         self:EnableMouse(true)
         self:Hide()
         FrameUtil.RegisterFrameForEvents(self, self.Events)
         self.Filters = {} ---@type table<string, CompactVendorFilterTemplate>
+        ---@diagnostic disable-next-line: missing-fields
         self.DropdownInfo = {} ---@type DropdownInfoPolyfill
         self.DropdownSortedFilters = {} ---@type string[]
         self.VendorOpen = false
@@ -432,6 +437,7 @@ local CompactVendorFilterToggleTemplate do
         if level ~= 1 then
             return
         end
+        ---@diagnostic disable-next-line: missing-fields
         local info = {} ---@type DropdownInfoPolyfill
         info.keepShownOnClick = true
         info.isNotRadio = true
@@ -582,6 +588,7 @@ local CompactVendorFilterDropDownTemplate do
     ---@param level number
     function CompactVendorFilterDropDownTemplate:GetDropdown(level)
         if level == 1 then
+            ---@diagnostic disable-next-line: missing-fields
             local info = {} ---@type DropdownInfoPolyfill
             info.keepShownOnClick = true
             info.isNotRadio = true
@@ -603,6 +610,7 @@ local CompactVendorFilterDropDownTemplate do
             end
             UIDropDownMenu_AddButton(info, level)
         elseif level == 2 and self.name == UIDROPDOWNMENU_MENU_VALUE then
+            ---@diagnostic disable-next-line: missing-fields
             local info = {} ---@type DropdownInfoPolyfill
             info.keepShownOnClick = true
             info.isNotRadio = true
@@ -702,7 +710,7 @@ local CompactVendorFilterDropDownWrapperTemplate do
         for value, _ in pairs(values) do
             local option = self:GetOption(value)
             if not option then
-                option = {}
+                option = {} ---@diagnostic disable-line: missing-fields
                 options[#options + 1] = option
             end
             option.value = value
@@ -769,7 +777,7 @@ local CompactVendorFilterDropDownToggleWrapperTemplate do
         for value, _ in pairs(values) do
             local option = self:GetOption(value)
             if not option then
-                option = {}
+                option = {} ---@diagnostic disable-line: missing-fields
                 options[#options + 1] = option
             end
             option.value = value
@@ -812,7 +820,7 @@ local CompactVendorFilterDropDownToggleWrapperTemplate do
     ---@param getValueText CompactVendorFilterDropDownToggleWrapperTemplateGetValueText?
     ---@param isYesNo boolean?
     function CompactVendorFilterDropDownToggleWrapperTemplate:New(name, getValueKey, getValueText, isYesNo)
-        local filter = CompactVendorFilterDropDownTemplate:New(name, {}, "itemLink", {}, self.OnRefreshWrapper, self.GetValueWrapper, self.HasValueWrapper)
+        local filter = CompactVendorFilterDropDownTemplate:New(name, {}, "itemLink", {}, self.OnRefreshWrapper, self.GetValueWrapper, self.HasValueWrapper) ---@class CompactVendorFilterDropDownToggleWrapperTemplate
         Mixin(filter, self)
         filter.getValueKey = getValueKey
         filter.getValueText = getValueText

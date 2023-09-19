@@ -35,6 +35,5 @@ nppBackup/
 *.ignore
 
 # Script related
-*.json
 *.php
 *.lua_backup
