@@ -16,6 +16,7 @@ local StaticPopup_Visible = StaticPopup_Visible ---@type fun(name: string): any,
 local CreateObjectPool = CreateObjectPool ---@type ObjectPoolFunction
 local CreateFramePool = CreateFramePool ---@type FramePoolFunction
 local IsCosmeticItem = IsCosmeticItem ---@type fun(item: string|number): boolean
+local PlayerHasToy = PlayerHasToy ---@type fun(item: string|number): boolean
 local GetCurrencyInfo = GetCurrencyInfo ---@type fun(item: string|number): string?, number, string, number, number, number, boolean, number
 local CallbackRegistryMixin = CallbackRegistryMixin ---@type CallbackRegistry
 local FrameUtil = FrameUtil ---@type table<any, any>
@@ -404,7 +405,10 @@ local IsTransmogCollected do
         if type(itemLink) ~= "string" then
             return
         end
-        if not C_Transmog or not C_Transmog.CanTransmogItem(itemLink) then
+        if not C_Transmog or not C_TransmogCollection then
+            return
+        end
+        if not C_Transmog.CanTransmogItem(itemLink) then
             return false
         end
         local _, sourceID = C_TransmogCollection.GetItemInfo(itemLink)
@@ -769,7 +773,7 @@ local TooltipScanner do
     ---@param rawData TooltipData
     ---@return boolean? isPending
     local function IsPending(rawData)
-        local args = rawData.lines[1].args
+        local args = rawData.lines[1].args ---@diagnostic disable-line: undefined-field
         if not args then
             return
         end
@@ -1240,7 +1244,10 @@ local UpdateMerchantItemButton do
     ---@param quality? number
     ---@return string name, number|string texture, number numItems, number? quality
     local function GetCurrencyContainerInfo(currencyID, numAvailable, name, texture, quality)
-        return CurrencyContainerUtil.GetCurrencyContainerInfo(currencyID, numAvailable, name, texture, quality) ---@diagnostic disable-line: undefined-global
+        if not CurrencyContainerUtil or not CurrencyContainerUtil.GetCurrencyContainerInfo then
+            return name, texture, numAvailable, quality
+        end
+        return CurrencyContainerUtil.GetCurrencyContainerInfo(currencyID, numAvailable, name, texture, quality)
     end
 
     ---@class MerchantItemCostItem
@@ -1409,7 +1416,7 @@ local UpdateMerchantItemButton do
         self.itemLinkOrID = self.itemLink or self.merchantItemID
         self.isHeirloom = self.merchantItemID and C_Heirloom and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
         self.isKnownHeirloom = self.isHeirloom and C_Heirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
-        self.showNonrefundablePrompt = C_MerchantFrame.IsMerchantItemRefundable and not C_MerchantFrame.IsMerchantItemRefundable(index)
+        self.showNonrefundablePrompt = C_MerchantFrame and C_MerchantFrame.IsMerchantItemRefundable and not C_MerchantFrame.IsMerchantItemRefundable(index)
         self.tintRed = not self.isPurchasable or (not self.isUsable and not self.isHeirloom)
         if self.numAvailable == 0 or self.isKnownHeirloom then
             if self.tintRed then
@@ -1463,12 +1470,12 @@ local UpdateMerchantItemButton do
         self.itemClassID,
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
-        self.isTransmog = C_Transmog and C_Transmog.CanTransmogItem(self.itemLinkOrID) ---@diagnostic disable-line: param-type-mismatch
+        self.isTransmog = C_Transmog and C_Transmog.CanTransmogItem(self.itemLinkOrID)
         self.isTransmogCollectable,
         self.isTransmogCollected = IsTransmogCollected(self.itemLink)
         self.isCosmetic = IsCosmeticItem and IsCosmeticItem(self.itemLinkOrID)
-        self.isToy = self.merchantItemID and C_ToyBox and C_ToyBox.GetToyInfo(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
-        self.isToyCollected = self.merchantItemID and PlayerHasToy(self.merchantItemID)
+        self.isToy = self.merchantItemID and C_ToyBox and C_ToyBox.GetToyInfo(self.merchantItemID) and true
+        self.isToyCollected = self.merchantItemID and PlayerHasToy and PlayerHasToy(self.merchantItemID)
         self.isLearnable = self.isCosmetic or self:IsLearnable()
         self.tooltipScannable = self.isLearnable
         if not self.tooltipScannable then
@@ -3280,13 +3287,13 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
             return count
         end
         local currencyID
-        if C_CurrencyInfo.GetCurrencyIDFromLink then
+        if C_CurrencyInfo and C_CurrencyInfo.GetCurrencyIDFromLink then
             currencyID = C_CurrencyInfo.GetCurrencyIDFromLink(itemLink)
         end
         if not currencyID or currencyID < 1 then
             return 0
         end
-        if C_CurrencyInfo.GetCurrencyInfo then
+        if C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
             count = C_CurrencyInfo.GetCurrencyInfo(currencyID).quantity
         elseif GetCurrencyInfo then
             count = select(2, GetCurrencyInfo(currencyID))

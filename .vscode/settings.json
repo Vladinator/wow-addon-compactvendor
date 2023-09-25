@@ -1,4 +1,8 @@
 {
+    "Lua.workspace.ignoreDir": [
+        ".vscode",
+        "libs"
+    ],
     "Lua.diagnostics.globals": [
         "BagSearch_OnChar",
         "BagSearch_OnTextChanged",
@@ -15,6 +19,7 @@
         "CreateFramePool",
         "CreateObjectPool",
         "CreateScrollBoxListLinearView",
+        "CurrencyContainerUtil",
         "DressUpBattlePetLink",
         "DressUpItemLink",
         "DressUpMountLink",
