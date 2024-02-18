@@ -1,5 +1,5 @@
 --[[
-Copyright 2013-2022 João Cardoso
+Copyright 2013-2024 João Cardoso
 ItemSearch is distributed under the terms of the GNU General Public License (Version 3).
 As a special exception, the copyright holders of this library give you permission to embed it
 with independent modules to produce an addon, regardless of the license terms of these
@@ -15,7 +15,7 @@ GNU General Public License for more details.
 This file is part of ItemSearch.
 --]]
 
-local Lib = LibStub:NewLibrary('ItemSearch-1.3', 2)
+local Lib = LibStub:NewLibrary('ItemSearch-1.3', 5)
 if Lib then
 	Lib.Unusable, Lib.Bangs = {}, {}
 	Lib.Filters = nil
@@ -50,7 +50,7 @@ function Lib:IsUnusable(id)
 		Lib.Unusable[id] = (function()
 			local lines = C.TooltipInfo.GetItemByID(id).lines
 			for i = #lines-1, 5, -1 do
-				local class = lines[i].args[2].stringVal:match(L.CLASS_REQUIREMENT)
+				local class = lines[i].leftText:match(L.CLASS_REQUIREMENT)
 				if class then
 					return not class:find(L.PLAYER_CLASS)
 				end
@@ -67,7 +67,7 @@ function Lib:IsQuestItem(id)
 		Lib.Bangs[id] = (function()
 			local lines = C.TooltipInfo.GetItemByID(id).lines
 			for i = 2, min(4, #lines) do
-				if lines[i].args[2].stringVal:find(ITEM_STARTS_QUEST) then
+				if lines[i].leftText:find(ITEM_STARTS_QUEST) then
 					return true
 				end
 			end
@@ -84,7 +84,7 @@ end
 
 --[[ Equipment Sets ]]--
 
-if IsAddOnLoaded('ItemRack') then
+if C.Addons.IsAddOnLoaded('ItemRack') then
 	function Lib:BelongsToSet(id, search)
 		if IsEquippableItem(id) then
 			for name, set in pairs(ItemRackUser.Sets) do
