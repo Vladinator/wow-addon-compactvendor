@@ -8,7 +8,7 @@ local statTable = {}
 ---@param itemLink string
 local function UpdateItemStatTable(itemLink)
     table.wipe(statTable)
-    GetItemStats(itemLink, statTable)
+    statTable = C_Item.GetItemStats(itemLink) or {}
     return statTable
 end
 
