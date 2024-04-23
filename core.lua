@@ -130,8 +130,10 @@ local ItemQualityColorToHexColor
 local ItemHexColorToQualityIndex
 local ColorPreset
 local BackgroundColorPreset
+local ItemCraftedStars
 local GetColorFromQuality
 local GetQualityFromLink
+local GetCraftedStarsFromLink
 local GetItemIDFromLink
 local GetInfoFromGUID
 local GetMoneyString
@@ -273,6 +275,35 @@ local ConvertToPattern do
         BackgroundColorPreset[7] = BackgroundColorPreset.Heirloom
     end
 
+    ---@class ItemCraftedStarsInfo
+    ---@field public rank number
+    ---@field public name string
+    ---@field public markup string
+
+    ---@type table<number, ItemCraftedStarsInfo>
+    ItemCraftedStars = {}
+
+    for i = 1, 5 do
+
+        local name = format("Professions-ChatIcon-Quality-Tier%d", i)
+        local info = C_Texture.GetAtlasInfo(name)
+
+        if not info then
+            break
+        end
+
+        local width = info.width
+        local height = info.height
+        local ratio = width/height
+
+        ItemCraftedStars[i] = {
+            rank = i,
+            name = name,
+            markup = CreateAtlasMarkup(name, ratio * 16, 16, info.leftTexCoord, info.topTexCoord),
+        }
+
+    end
+
     ---@param quality? number
     ---@return SimpleColor? color
     function GetColorFromQuality(quality)
@@ -287,6 +318,17 @@ local ConvertToPattern do
     function GetQualityFromLink(itemLink)
         local hex = itemLink:match("|c([%x]+)|")
         return hex and ItemHexColorToQualityIndex[hex]
+    end
+
+    ---@param itemLink string
+    ---@return number rank, string markup
+    function GetCraftedStarsFromLink(itemLink)
+        for _, info in ipairs(ItemCraftedStars) do
+            if itemLink:find(info.name, nil, true) then
+                return info.rank, info.markup
+            end
+        end
+        return 0, ""
     end
 
     ---@param itemLink string
@@ -873,7 +915,7 @@ local TooltipScanner do
     ---@param hideVendorPrice? boolean
     ---@return TooltipItem itemData
     function TooltipScanner:ConvertToTooltipItem(tooltipData, hyperlinkOrIndex, optionalArg1, optionalArg2, hideVendorPrice)
-        if TooltipUtil then
+        if TooltipUtil and TooltipUtil.SurfaceArgs then
             TooltipUtil.SurfaceArgs(tooltipData)
             for _, line in ipairs(tooltipData.lines) do
                 TooltipUtil.SurfaceArgs(line)
@@ -1231,6 +1273,7 @@ local UpdateMerchantItemButton do
         Gold = 1,
         Currency = 2,
         GoldAndCurrency = 3,
+        Free = 4,
     }
 
     ---@enum MerchantItemAvailabilityType
@@ -1311,6 +1354,8 @@ local UpdateMerchantItemButton do
     ---@field public isCollected? boolean
     ---@field public isCollectedNum? number
     ---@field public isCollectedNumMax? number
+    ---@field public craftedStars? number
+    ---@field public craftedStarsMarkup? string
 
     local MerchantItem = {} ---@class MerchantItem
 
@@ -1456,6 +1501,12 @@ local UpdateMerchantItemButton do
                     costItem.quality = GetQualityFromLink(costItem.itemLink)
                 end
             end
+        end
+        if self.canAfford and self.price <= 0 and (not self.extendedCost or self.extendedCostCount == 0) then
+            self.costType = MerchantItemCostType.Free
+        end
+        if not self.craftedStars and self.itemLink then
+            self.craftedStars, self.craftedStarsMarkup = GetCraftedStarsFromLink(self.itemLink)
         end
         if not self.quality and self.itemLink then
             self.quality = GetQualityFromLink(self.itemLink)
@@ -1632,9 +1683,10 @@ local UpdateMerchantItemButton do
     ---@param merchantItem MerchantItem
     local function GetTextForItem(merchantItem)
         return format(
-            "%s%s%s",
+            "%s%s%s%s",
             merchantItem.numAvailable and merchantItem.numAvailable > -1 and format("|cffFFFF00[%d]|r ", merchantItem.numAvailable) or "",
             merchantItem.name or SEARCH_LOADING_TEXT,
+            merchantItem.craftedStars and merchantItem.craftedStars > 0 and format(" %s", merchantItem.craftedStarsMarkup) or "",
             merchantItem.stackCount and merchantItem.stackCount > 1 and format(" |cffFFFF00x%d|r", merchantItem.stackCount) or ""
         )
     end
