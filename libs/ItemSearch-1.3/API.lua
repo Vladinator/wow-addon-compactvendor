@@ -1,3 +1,7 @@
+local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded ---@diagnostic disable-line: deprecated
+local IsEquippableItem = IsEquippableItem or C_Item.IsEquippableItem ---@diagnostic disable-line: deprecated
+local GetItemInfo = GetItemInfo or C_Item.GetItemInfo ---@diagnostic disable-line: deprecated
+
 --[[
 Copyright 2013-2022 João Cardoso
 ItemSearch is distributed under the terms of the GNU General Public License (Version 3).

@@ -1,3 +1,5 @@
+local GetItemStats = GetItemStats or C_Item.GetItemStats ---@diagnostic disable-line: deprecated
+
 local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate ---@type CompactVendorFilterDropDownTemplate
 
 ---@alias StatTablePolyfill table<string, number>

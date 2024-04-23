@@ -1,3 +1,5 @@
+local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded ---@diagnostic disable-line: deprecated
+
 local CompactVendorFrame = CompactVendorFrame ---@type CompactVendorFrame
 
 ---@class DropdownInfoPolyfill
