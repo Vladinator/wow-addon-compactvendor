@@ -1,5 +1,3 @@
-local GetItemStats = GetItemStats or C_Item.GetItemStats ---@diagnostic disable-line: deprecated
-
 local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate ---@type CompactVendorFilterDropDownTemplate
 
 ---@alias StatTablePolyfill table<string, number>
@@ -8,9 +6,16 @@ local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate 
 local statTable = {}
 
 ---@param itemLink string
+---@return StatTablePolyfill? statTable
 local function UpdateItemStatTable(itemLink)
-    table.wipe(statTable)
-    GetItemStats(itemLink, statTable)
+    if C_Item.GetItemStats then
+        statTable = C_Item.GetItemStats(itemLink)
+    elseif GetItemStats then
+        if statTable then
+            table.wipe(statTable)
+        end
+        statTable = GetItemStats(itemLink, statTable)
+    end
     return statTable
 end
 
@@ -25,9 +30,10 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         table.wipe(values)
         for _, itemData in ipairs(items) do
             local itemLink = itemData[itemDataKey] ---@type string
-            UpdateItemStatTable(itemLink)
-            for statKey, _ in pairs(statTable) do
-                values[statKey] = true
+            if UpdateItemStatTable(itemLink) then
+                for statKey, _ in pairs(statTable) do
+                    values[statKey] = true
+                end
             end
         end
         for _, option in ipairs(options) do
@@ -51,8 +57,11 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         return UpdateItemStatTable(itemLink)
     end,
     ---@param value string?
-    ---@param itemValue StatTablePolyfill
+    ---@param itemValue StatTablePolyfill?
     function(_, value, itemValue)
+        if not itemValue then
+            return
+        end
         for statKey, _ in pairs(itemValue) do
             if statKey == value then
                 return false
