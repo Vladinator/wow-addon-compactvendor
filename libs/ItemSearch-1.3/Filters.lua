@@ -1,7 +1,7 @@
 local GetItemInfo = GetItemInfo or C_Item.GetItemInfo ---@type fun(itemInfo: ItemInfo): itemName: string, itemLink: string, itemQuality: Enum.ItemQuality, itemLevel: number, itemMinLevel: number, itemType: string, itemSubType: string, itemStackCount: number, itemEquipLoc: string, itemTexture: fileID, sellPrice: number, classID: number, subclassID: number, bindType: number, expansionID: number, setID: number?, isCraftingReagent: boolean
 
 --[[
-Copyright 2013-2022 João Cardoso
+Copyright 2013-2024 João Cardoso
 ItemSearch is distributed under the terms of the GNU General Public License (Version 3).
 As a special exception, the copyright holders of this library give you permission to embed it
 with independent modules to produce an addon, regardless of the license terms of these
@@ -43,7 +43,7 @@ Lib.Filters.tooltip = {
                      or C.TooltipInfo.GetHyperlink(item.link)
         if data then
             for i, line in ipairs(data.lines) do
-                if Parser:Find(search, line.args[2].stringVal) then
+                if Parser:Find(search, line.leftText) then
                     return true
                 end
             end
@@ -61,6 +61,37 @@ Lib.Filters.class = {
     match = function(self, item, _, search)
         local class, subClass = select(6, GetItemInfo(item.link))
         return Parser:Find(search, class, subClass)
+    end
+}
+
+Lib.Filters.level = {
+    tags = {'l', 'level', 'lvl', 'ilvl'},
+
+    canSearch = function(self, operator, search)
+        return (operator or not inRetail) and tonumber(search)
+    end,
+
+    match = function(self, item, operator, num)
+        local lvl = item.location and C.Item.GetCurrentItemLevel(item.location)
+                    or select(4, GetItemInfo(item.link))
+        if lvl then
+            return Parser:Compare(operator, lvl, num)
+        end
+    end
+}
+
+Lib.Filters.requiredlevel = {
+    tags = {'r', 'req', 'rl', 'reql', 'reqlvl'},
+
+    canSearch = function(self, operator, search)
+        return (operator or not inRetail) and tonumber(search)
+    end,
+
+    match = function(self, item, operator, num)
+        local lvl = select(5, GetItemInfo(item.link))
+        if lvl then
+            return Parser:Compare(operator, lvl, num)
+        end
     end
 }
 
@@ -95,7 +126,7 @@ Lib.Filters.quality = {
 
     match = function(self, item, operator, target)
         local quality = item.link:find('battlepet') and tonumber(item.link:match('%d+:%d+:(%d+)'))
-                        or C_Item.GetItemQualityByID(item.link)
+                        or C.Item.GetItemQualityByID(item.link)
         return Parser:Compare(operator, quality, target)
     end,
 }
@@ -140,40 +171,7 @@ Lib.Filters.name = {
     end,
 
     match = function(self, item, _, search)
-        return Parser:Find(search, C_Item.GetItemNameByID(item.link) or item.link:match('%[(.+)%]'))
-    end
-}
-
-Lib.Filters.level = {
-    tags = {'l', 'level', 'lvl', 'ilvl'},
-    onlyTags = inRetail,
-
-    canSearch = function(self, _, search)
-        return tonumber(search)
-    end,
-
-    match = function(self, item, operator, num)
-        local lvl = item.location and Item.GetCurrentItemLevel(item.location)
-                    or select(4, GetItemInfo(item.link))
-        if lvl then
-            return Parser:Compare(operator, lvl, num)
-        end
-    end
-}
-
-Lib.Filters.requiredlevel = {
-    tags = {'r', 'req', 'rl', 'reql', 'reqlvl'},
-    onlyTags = inRetail,
-
-    canSearch = function(self, _, search)
-        return tonumber(search)
-    end,
-
-    match = function(self, item, operator, num)
-        local lvl = select(5, GetItemInfo(item.link))
-        if lvl then
-            return Parser:Compare(operator, lvl, num)
-        end
+        return Parser:Find(search, C.Item.GetItemNameByID(item.link) or item.link:match('%[(.+)%]'))
     end
 }
 
@@ -199,7 +197,7 @@ Lib.Filters.bound = {
     end,
 
     match = function(self, item)
-        return item.location and C_Item.IsBound(item.location)
+        return item.location and C.Item.IsBound(item.location)
     end
 }
 
