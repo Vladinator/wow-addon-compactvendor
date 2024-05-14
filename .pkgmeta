@@ -1,9 +1,4 @@
 package-as: CompactVendor
 enable-nolib-creation: no
-tools-used:
-  - libstub
-  - c-everywhere
-  - unfit
-  - customsearch
 ignore:
   - .travis.yml

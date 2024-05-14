@@ -7,6 +7,5 @@
 ## SavedVariables: CompactVendorDB
 ## X-Curse-Project-ID: 332178
 ## X-WoWI-ID: 25073
-libs.xml
 core.xml
 filter\core.xml

@@ -34,14 +34,6 @@ local MerchantNextPageButton = MerchantNextPageButton ---@type Button
 local MerchantPageText = MerchantPageText ---@type FontString
 local MerchantPrevPageButton = MerchantPrevPageButton ---@type Button
 
----@class ItemSearch-1.3
----@field private Unusable table<number, boolean?>
----@field private Bangs table<number, boolean?>
----@field public Matches fun(self: ItemSearch-1.3, item: table|string|number, search: string): boolean?
----@field public IsUnusable fun(self: ItemSearch-1.3, id: number): isUnusable: boolean
----@field public IsQuestItem fun(self: ItemSearch-1.3, id: number): isQuestItem: boolean, isBang: boolean?
-local LibItemSearch = LibStub("ItemSearch-1.3", true)
-
 local addonName, ---@type string CompactVendor
     ns = ... ---@class CompactVendorNS
 
@@ -2303,8 +2295,8 @@ local Frame do
             if not name then
                 return
             end
-            if LibItemSearch then
-                return LibItemSearch:Matches(itemData.itemLinkOrID, searchText) ~= true
+            if ns.Search then
+                return ns.Search.Matches(itemData.itemLinkOrID, searchText) ~= true
             end
             local index = name:lower():find(searchText, nil, true)
             return index == nil

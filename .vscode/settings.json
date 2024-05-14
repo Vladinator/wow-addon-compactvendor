@@ -1,7 +1,6 @@
 {
     "Lua.workspace.ignoreDir": [
-        ".vscode",
-        "libs"
+        ".vscode"
     ],
     "Lua.diagnostics.globals": [
         "BagSearch_OnChar",
