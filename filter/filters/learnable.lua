@@ -11,6 +11,9 @@ do
             if itemData.isToy then
                 return itemData.isToyCollected ~= nil
             end
+            if itemData.isCosmeticBundle then
+                return itemData.isCosmeticBundleCollected ~= nil
+            end
             return not not itemData.isLearnable
         end,
         function(self, value)
@@ -31,7 +34,7 @@ do
             if (not itemData.isHeirloom) and (not itemData.isToy) and (not itemData.isLearnable) and (not itemData.isCollectedNum) then
                 return
             end
-            return itemData.isKnownHeirloom or itemData.isToyCollected or itemData.isLearned or (itemData.isCollectedNum and itemData.isCollectedNum > 0) or false
+            return itemData.isKnownHeirloom or itemData.isToyCollected or itemData.isCosmeticBundleCollected or itemData.isLearned or (itemData.isCollectedNum and itemData.isCollectedNum > 0) or false
         end,
         function(self, value)
             return value and YES or NO

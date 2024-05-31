@@ -16,6 +16,7 @@ local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant  ---@
 local GetItemQualityColor = GetItemQualityColor or C_Item.GetItemQualityColor ---@type fun(quality: number): r: number, g: number, b: number, hex: string
 local HandleModifiedItemClick = HandleModifiedItemClick ---@type fun(itemLink: string): boolean
 local IsCosmeticItem = IsCosmeticItem or C_Item.IsCosmeticItem ---@type fun(item: string|number): boolean
+local IsDressableItemByID = IsDressableItem or C_Item.IsDressableItemByID ---@type fun(item: string|number): boolean
 local MerchantFrame_ConfirmExtendedItemCost = MerchantFrame_ConfirmExtendedItemCost ---@type fun(self: Region, quantity: number)
 local PlayerHasToy = PlayerHasToy ---@type fun(item: string|number): boolean
 local SearchBoxTemplate_OnLoad = SearchBoxTemplate_OnLoad ---@type fun(self: EditBox)
@@ -455,6 +456,49 @@ local IsTransmogCollected do
         end
         local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
         return true, isCollected
+    end
+
+end
+
+local IsCosmeticBundleCollected do
+
+    ---@param itemLink string
+    ---@return boolean? canCollect, boolean? isCollected, number? numCollectedItems, number? numTotalItems
+    function IsCosmeticBundleCollected(itemLink)
+        if type(itemLink) ~= "string" then
+            return
+        end
+        if not C_Transmog or not C_TransmogCollection then
+            return
+        end
+        if C_Transmog.CanTransmogItem(itemLink) or (IsCosmeticItem and IsCosmeticItem(itemLink)) then
+            return
+        end
+        if not IsDressableItemByID(itemLink) then
+            return false
+        end
+        if not C_Item.GetItemLearnTransmogSet then
+            return false
+        end
+        local setID = C_Item.GetItemLearnTransmogSet(itemLink)
+        if not setID then
+            return false
+        end
+        local setItems = C_Transmog.GetAllSetAppearancesByID(setID)
+        if not setItems then
+            return false
+        end
+        local hasMissing = false
+        for i = 1, #setItems do
+            local setItem = setItems[i]
+            local sourceID = setItem.itemModifiedAppearanceID
+            local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
+            if not isCollected then
+                hasMissing = true
+                break
+            end
+        end
+        return true, not hasMissing
     end
 
 end
@@ -1335,6 +1379,10 @@ local UpdateMerchantItemButton do
     ---@field public isTransmogCollectable? boolean
     ---@field public isTransmogCollected? boolean
     ---@field public isCosmetic? boolean
+    ---@field public isCosmeticBundle? boolean
+    ---@field public isCosmeticBundleCollected? boolean
+    ---@field public isCosmeticBundleNum? number
+    ---@field public isCosmeticBundleNumMax? number
     ---@field public isToy? boolean
     ---@field public isToyCollected? boolean
     ---@field public isLearnable? boolean
@@ -1521,10 +1569,20 @@ local UpdateMerchantItemButton do
         self.isTransmogCollectable,
         self.isTransmogCollected = IsTransmogCollected(self.itemLink)
         self.isCosmetic = IsCosmeticItem and IsCosmeticItem(self.itemLinkOrID)
+        self.isCosmeticBundle,
+        self.isCosmeticBundleCollected,
+        self.isCosmeticBundleNum,
+        self.isCosmeticBundleNumMax = IsCosmeticBundleCollected(self.itemLink)
         self.isToy = self.merchantItemID and C_ToyBox and C_ToyBox.GetToyInfo(self.merchantItemID) and true
         self.isToyCollected = self.merchantItemID and PlayerHasToy and PlayerHasToy(self.merchantItemID)
-        self.isLearnable = self.isCosmetic or self:IsLearnable()
+        self.isLearnable = self.isCosmetic or self.isCosmeticBundle or self:IsLearnable()
         self.tooltipScannable = self.isLearnable
+        if self.isCosmeticBundle then
+            self.isCollected = self.isCosmeticBundleCollected
+            self.isCollectedNum = self.isCosmeticBundleNum
+            self.isCollectedNumMax = self.isCosmeticBundleNumMax
+            self.tooltipScannable = false
+        end
         if not self.tooltipScannable then
             return
         end
@@ -1702,19 +1760,21 @@ local UpdateMerchantItemButton do
         local isPurchasable = not merchantItem.tintRed
         local isUsable = merchantItem.isUsable
         local canAfford = merchantItem.canAfford
-        local isTransmogCollectable = merchantItem.isTransmogCollectable
-        local isTransmogCollected = merchantItem.isTransmogCollected
+        -- local isTransmogCollectable = merchantItem.isTransmogCollectable
+        -- local isTransmogCollected = merchantItem.isTransmogCollected
+        -- local isCosmeticBundle = merchantItem.isCosmeticBundle
+        local isCosmeticBundleCollected = merchantItem.isCosmeticBundleCollected
         local isToyCollected = merchantItem.isToyCollected
-        local canLearn = merchantItem.canLearn
+        -- local canLearn = merchantItem.canLearn
         local canLearnRequirement = merchantItem.canLearnRequirement
         local isLearned = merchantItem.isLearned
         local isCollected = merchantItem.isCollected
-        local isCollectedNum = merchantItem.isCollectedNum
-        local isCollectedNumMax = merchantItem.isCollectedNumMax
+        -- local isCollectedNum = merchantItem.isCollectedNum
+        -- local isCollectedNumMax = merchantItem.isCollectedNumMax
         if not isPurchasable or not isUsable or not canAfford then
             backgroundColor = BackgroundColorPreset.Red
         end
-        if isToyCollected or isLearned or isCollected then
+        if isCosmeticBundleCollected or isToyCollected or isLearned or isCollected then
             backgroundColor = BackgroundColorPreset.None
             textColor = ColorPreset.Gray
         elseif canLearnRequirement and canLearnRequirement.type == 1 then -- Profession
