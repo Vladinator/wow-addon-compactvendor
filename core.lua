@@ -488,17 +488,23 @@ local IsCosmeticBundleCollected do
         if not setItems then
             return false
         end
-        local hasMissing = false
+        local slotCollected = {} ---@type table<number, boolean>
         for i = 1, #setItems do
             local setItem = setItems[i]
-            local sourceID = setItem.itemModifiedAppearanceID
-            local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
-            if not isCollected then
-                hasMissing = true
-                break
+            local itemModifiedAppearanceID = setItem.itemModifiedAppearanceID
+            local invSlot = setItem.invSlot
+            local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(itemModifiedAppearanceID)
+            slotCollected[invSlot] = slotCollected[invSlot] or isCollected
+        end
+        local numAvailable = 0
+        local numCollected = 0
+        for _, isCollected in pairs(slotCollected) do
+            numAvailable = numAvailable + 1
+            if isCollected then
+                numCollected = numCollected + 1
             end
         end
-        return true, not hasMissing
+        return true, numAvailable == numCollected, numCollected, numAvailable
     end
 
 end

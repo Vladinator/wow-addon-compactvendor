@@ -14,6 +14,9 @@ do
             if itemData.isCosmeticBundle then
                 return itemData.isCosmeticBundleCollected ~= nil
             end
+            if itemData.isCollected then
+                return itemData.isCollectedNum ~= nil and itemData.isCollectedNumMax ~= nil
+            end
             return not not itemData.isLearnable
         end,
         function(self, value)
@@ -31,10 +34,10 @@ do
     local filter = CompactVendorFilterDropDownToggleWrapperTemplate:New(
         "Learnable: Collected",
         function(self, itemLink, itemData)
-            if (not itemData.isHeirloom) and (not itemData.isToy) and (not itemData.isLearnable) and (not itemData.isCollectedNum) then
+            if (not itemData.isHeirloom) and (not itemData.isToy) and (not itemData.isCosmeticBundle) and (not itemData.isCollected) and (not itemData.isLearnable) then
                 return
             end
-            return itemData.isKnownHeirloom or itemData.isToyCollected or itemData.isCosmeticBundleCollected or itemData.isLearned or (itemData.isCollectedNum and itemData.isCollectedNum > 0) or false
+            return itemData.isKnownHeirloom or itemData.isToyCollected or itemData.isCosmeticBundleCollected or itemData.isCollectedNum == itemData.isCollectedNumMax or itemData.isLearned or false
         end,
         function(self, value)
             return value and YES or NO
