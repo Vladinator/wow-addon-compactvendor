@@ -488,13 +488,18 @@ local IsCosmeticBundleCollected do
         if not setItems then
             return false
         end
+        local totalAvailable = #setItems
+        local totalCollected = 0
         local slotCollected = {} ---@type table<number, boolean>
-        for i = 1, #setItems do
+        for i = 1, totalAvailable do
             local setItem = setItems[i]
             local itemModifiedAppearanceID = setItem.itemModifiedAppearanceID
             local invSlot = setItem.invSlot
             local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(itemModifiedAppearanceID)
             slotCollected[invSlot] = slotCollected[invSlot] or isCollected
+            if isCollected then
+                totalCollected = totalCollected + 1
+            end
         end
         local numAvailable = 0
         local numCollected = 0
@@ -504,7 +509,7 @@ local IsCosmeticBundleCollected do
                 numCollected = numCollected + 1
             end
         end
-        return true, numAvailable == numCollected, numCollected, numAvailable
+        return true, numAvailable == numCollected, totalCollected, totalAvailable
     end
 
 end

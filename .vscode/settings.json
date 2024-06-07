@@ -95,6 +95,7 @@
         "UIDROPDOWNMENU_MENU_VALUE",
         "UIDROPDOWNMENU_OPEN_MENU",
         "UIDropDownMenu_SetInitializeFunction",
-        "YES"
+        "YES",
+        "PROFESSIONS_COLUMN_REAGENTS_PARTIAL"
     ]
 }
