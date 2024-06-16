@@ -2400,7 +2400,6 @@ local Frame do
         ---@class CompactVendorFrameSearchBox : EditBox
         ---@field public clearButton Button
 
-        ---@diagnostic disable-next-line: assign-type-mismatch
         self.Search = CreateFrame("EditBox", nil, self, "SearchBoxTemplate") ---@class CompactVendorFrameSearchBox
         self.Search:SetSize(102, 32)
         self.Search:SetMultiLine(false)
@@ -2410,10 +2409,16 @@ local Frame do
 
         SearchBoxTemplate_OnLoad(self.Search)
 
-        if MerchantFrameLootFilter then
-            self.Search:SetPoint("RIGHT", MerchantFrameLootFilter, "LEFT", 14, 3)
+        local merchantFilter = MerchantFrameLootFilter or MerchantFrame.FilterDropdown ---@type Frame?
+        if merchantFilter then
+            if IS_TWW then
+                self.Search:SetPoint("RIGHT", merchantFilter, "LEFT", -8, 0)
+            else
+                self.Search:SetPoint("RIGHT", merchantFilter, "LEFT", 14, 3)
+            end
         else
-            self.Search:SetPoint("LEFT", MerchantFramePortrait, "RIGHT", 12, -19)
+            local merchantPortrait = MerchantFramePortrait or MerchantFrame.PortraitContainer.portrait ---@type Frame
+            self.Search:SetPoint("LEFT", merchantPortrait, "RIGHT", 12, -19)
             self.Search:SetPoint("RIGHT", MerchantFrame, "RIGHT", -12, 0)
         end
 
