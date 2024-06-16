@@ -13,7 +13,7 @@ local GetCurrencyInfo = GetCurrencyInfo ---@type fun(item: string|number): strin
 local GetItemCount = GetItemCount or C_Item.GetItemCount ---@type fun(itemInfo: ItemInfo, includeBank?: boolean, includeUses?: boolean, includeReagentBank?: boolean): count: number
 local GetItemInfo = GetItemInfo or C_Item.GetItemInfo ---@type fun(itemInfo: ItemInfo): itemName: string, itemLink: string, itemQuality: Enum.ItemQuality, itemLevel: number, itemMinLevel: number, itemType: string, itemSubType: string, itemStackCount: number, itemEquipLoc: string, itemTexture: fileID, sellPrice: number, classID: number, subclassID: number, bindType: number, expansionID: number, setID: number?, isCraftingReagent: boolean
 local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant  ---@type fun(itemInfo: ItemInfo): itemID: number, itemType: string, itemSubType: string, itemEquipLoc: string, icon: fileID, classID: number, subClassID: number
-local GetItemQualityColor = GetItemQualityColor or C_Item.GetItemQualityColor ---@type fun(quality: number): r: number, g: number, b: number, hex: string
+-- local GetItemQualityColor = GetItemQualityColor or C_Item.GetItemQualityColor ---@type fun(quality: number): r: number, g: number, b: number, hex: string
 local HandleModifiedItemClick = HandleModifiedItemClick ---@type fun(itemLink: string): boolean
 local IsCosmeticItem = IsCosmeticItem or C_Item.IsCosmeticItem ---@type fun(item: string|number): boolean
 local IsDressableItemByID = IsDressableItem or C_Item.IsDressableItemByID ---@type fun(item: string|number): boolean
@@ -37,6 +37,8 @@ local MerchantPrevPageButton = MerchantPrevPageButton ---@type Button
 
 local addonName, ---@type string CompactVendor
     ns = ... ---@class CompactVendorNS
+
+local IS_TWW = select(4, GetBuildInfo()) >= 110000
 
 local CompactVendorDBDefaults ---@class CompactVendorDBDefaults
 local ListItemScaleToFontObject
@@ -143,9 +145,31 @@ local ConvertToPattern do
     ItemHexColorToQualityIndex = {} ---@type table<string, number>
     ColorPreset = {} ---@type table<string|number, SimpleColor>
 
+    local HardcodedQualityColors = {
+        [0] = { r = 0.62, g = 0.62, b = 0.62, hex = "ff9d9d9d" },
+        [1] = { r = 1.00, g = 1.00, b = 1.00, hex = "ffffffff" },
+        [2] = { r = 0.12, g = 1.00, b = 0.00, hex = "ff1eff00" },
+        [3] = { r = 0.00, g = 0.44, b = 0.87, hex = "ff0070dd" },
+        [4] = { r = 0.64, g = 0.21, b = 0.93, hex = "ffa335ee" },
+        [5] = { r = 1.00, g = 0.50, b = 0.00, hex = "ffff8000" },
+        [6] = { r = 0.90, g = 0.80, b = 0.50, hex = "ffe6cc80" },
+        [7] = { r = 0.00, g = 0.80, b = 1.00, hex = "ff00ccff" },
+        [8] = { r = 0.00, g = 0.80, b = 1.00, hex = "ff00ccff" },
+    }
+
     for i = 0, 8 do
 
-        local r, g, b, hex = GetItemQualityColor(i)
+        -- ---@type any, number, number, string
+        -- local r, g, b, hex = GetItemQualityColor(i)
+
+        -- if IS_TWW then
+        --     local color = r ---@type ColorMixin
+        --     r, g, b = color.r, color.g, color.b
+        --     hex = color:GenerateHexColor()
+        -- end
+
+        local colorInfo = HardcodedQualityColors[i]
+        local r, g, b, hex = colorInfo.r, colorInfo.g, colorInfo.b, colorInfo.hex
 
         ---@type SimpleColor
         local color = {
@@ -309,7 +333,7 @@ local ConvertToPattern do
     ---@param itemLink string
     ---@return number? quality
     function GetQualityFromLink(itemLink)
-        local hex = itemLink:match("|c([%x]+)|")
+        local hex = itemLink:match("|c([a-fA-F0-9]+)|")
         return hex and ItemHexColorToQualityIndex[hex]
     end
 
@@ -2451,6 +2475,7 @@ local Frame do
 
         ---@class ViewPolyfill
         ---@field public templateInfos table<string, table<string, any>>
+        ---@field public templateInfoCache table<string, table<string, table<string, any>>>
         ---@field public SetPadding fun(self: ViewPolyfill, top?: number, bottom?: number, left?: number, right?: number, spacing?: number)
         ---@field public GetSpacing fun(self: ViewPolyfill): number
         ---@field public GetStride fun(self: ViewPolyfill): number
@@ -2622,9 +2647,16 @@ local Frame do
         self.ScrollBar:SetPoint("TOPLEFT", self.ScrollBox, "TOPRIGHT", -1, 2)
         self.ScrollBar:SetPoint("BOTTOMLEFT", self.ScrollBox, "BOTTOMRIGHT", -1, -3)
 
+        local templateKey = "CompactVendorFrameMerchantButtonTemplate"
+        local templateInfo = { type = "Button", width = 300, height = 24, keyValues = {} }
+
         local view = CreateScrollBoxListLinearView() ---@type ViewPolyfill
-        view.templateInfos["CompactVendorFrameMerchantButtonTemplate"] = { type = "Button", width = 300, height = 24, keyValues = {} }
-        view:SetElementInitializer("CompactVendorFrameMerchantButtonTemplate", CreateMerchantItemButton)
+        if view.templateInfoCache then
+            view.templateInfoCache.templateInfos[templateKey] = templateInfo
+        else
+            view.templateInfos[templateKey] = templateInfo
+        end
+        view:SetElementInitializer(templateKey, CreateMerchantItemButton)
         view:SetPadding(2, 2, 2, 2, 0)
         ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view)
 
