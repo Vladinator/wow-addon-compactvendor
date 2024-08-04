@@ -70,12 +70,14 @@ do
         local options = self.options
         local value ---@type number
         local text ---@type string
-        if current == total then
-            value = 1
-            text = YES
-        elseif collected or current > 0 then
-            value = 2
-            text = PROFESSIONS_COLUMN_REAGENTS_PARTIAL
+        if collected then
+            if current == total then
+                value = 1
+                text = YES
+            else
+                value = 2
+                text = PROFESSIONS_COLUMN_REAGENTS_PARTIAL
+            end
         else
             value = 3
             text = NO
