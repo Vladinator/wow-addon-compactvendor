@@ -31,7 +31,7 @@ do
             return itemData.isTransmogCollected
         end,
         function(self, value)
-            return value and TRANSMOG_COLLECTED or NOT_COLLECTED
+            return value and YES or NO
         end
     )
 
