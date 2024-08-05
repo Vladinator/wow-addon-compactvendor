@@ -460,7 +460,39 @@ local ConvertToPattern do
 
 end
 
+local CanTransmogItem
 local IsTransmogCollected do
+
+    ---@type table<string, boolean?>
+    local ignoreEquipLoc = {
+        INVTYPE_NON_EQUIP = true,
+        INVTYPE_NECK = true,
+        INVTYPE_FINGER = true,
+        INVTYPE_TRINKET = true,
+    }
+
+    ---@param itemLinkOrID string|number
+    ---@return boolean? canTransmog
+    function CanTransmogItem(itemLinkOrID)
+        if not itemLinkOrID then
+            return
+        end
+        local type = type(itemLinkOrID)
+        if type ~= "string" and type ~= "number" then
+            return
+        end
+        if not C_Transmog then
+            return
+        end
+        local _, _, _, itemEquipLoc = C_Item.GetItemInfoInstant(itemLinkOrID)
+        if itemEquipLoc and ignoreEquipLoc[itemEquipLoc] then
+            return
+        end
+        if not C_Transmog.CanTransmogItem(itemLinkOrID) then
+            return false
+        end
+        return true
+    end
 
     ---@param itemLink string
     ---@return boolean? canCollect, boolean? isCollected
@@ -471,12 +503,13 @@ local IsTransmogCollected do
         if not C_Transmog or not C_TransmogCollection then
             return
         end
-        if not C_Transmog.CanTransmogItem(itemLink) then
+        if not CanTransmogItem(itemLink) then
             return false
         end
         local _, sourceID = C_TransmogCollection.GetItemInfo(itemLink)
         if not sourceID then
-            return true, false
+            local isCollected = C_TransmogCollection.PlayerHasTransmogByItemInfo(itemLink)
+            return true, isCollected
         end
         local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
         return true, isCollected
@@ -495,7 +528,7 @@ local IsCosmeticBundleCollected do
         if not C_Transmog or not C_TransmogCollection then
             return
         end
-        if C_Transmog.CanTransmogItem(itemLink) or (IsCosmeticItem and IsCosmeticItem(itemLink)) then
+        if CanTransmogItem(itemLink) or (IsCosmeticItem and IsCosmeticItem(itemLink)) then
             return
         end
         if not IsDressableItemByID(itemLink) then
@@ -1600,7 +1633,7 @@ local UpdateMerchantItemButton do
         self.itemClassID,
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
-        self.isTransmog = C_Transmog and C_Transmog.CanTransmogItem(self.itemLinkOrID)
+        self.isTransmog = CanTransmogItem(self.itemLinkOrID)
         self.isTransmogCollectable,
         self.isTransmogCollected = IsTransmogCollected(self.itemLink)
         self.isCosmetic = IsCosmeticItem and IsCosmeticItem(self.itemLinkOrID)
