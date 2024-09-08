@@ -1,11 +1,13 @@
-## Interface: 30403
+## Interface: 40400
 ## IconAtlas: Banker
 ## Title: CompactVendor
 ## Notes: Compact Vendor converts your vendor frame into a compact scrollable list with a search box. Inspiration drawn from Tekkub's GnomishVendorShrinker.
 ## Author: Vladinator
-## Version: 3.4.3.240805
+## Version: 4.4.0.240908
 ## SavedVariables: CompactVendorDB
 ## X-Curse-Project-ID: 332178
 ## X-WoWI-ID: 25073
+## X-Wago-ID: Mj6j0mGR
+## X-AddonProvider: github
 core.xml
 filter\core.xml
