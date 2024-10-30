@@ -333,6 +333,7 @@ local CompactVendorFilterTemplate do
     ---@param name string?
     ---@param defaults CompactVendorFilterTemplateDefaults?
     function CompactVendorFilterTemplate:New(name, defaults)
+        ---@diagnostic disable-next-line: missing-fields
         local filter = {} ---@type CompactVendorFilterTemplate
         Mixin(filter, self)
         if name ~= nil then

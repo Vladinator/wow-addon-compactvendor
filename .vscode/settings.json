@@ -1,4 +1,19 @@
 {
+    "Lua.runtime.version": "Lua 5.1",
+    "Lua.runtime.builtin": {
+        "basic": "disable",
+        "debug": "disable",
+        "io": "disable",
+        "math": "disable",
+        "os": "disable",
+        "package": "disable",
+        "string": "disable",
+        "table": "disable",
+        "utf8": "disable"
+    },
+    "Lua.workspace.library": [
+        "~\\.vscode\\extensions\\ketho.wow-api-0.17.6\\Annotations"
+    ],
     "Lua.workspace.ignoreDir": [
         ".vscode"
     ],
@@ -14,6 +29,7 @@
         "CompactVendorFrameMerchantStackSplitFrame",
         "COPPER_AMOUNT_SYMBOL",
         "COPPER_AMOUNT_TEXTURE",
+        "COPPER_PER_SILVER",
         "CreateDataProvider",
         "CreateFramePool",
         "CreateObjectPool",
@@ -27,6 +43,7 @@
         "ENABLE_COLORBLIND_MODE",
         "EQUIPMENT_SETS",
         "ERR_COSMETIC_KNOWN",
+        "FONT_COLOR_CODE_CLOSE",
         "FrameUtil",
         "GameTooltip_ShowCompareItem",
         "GetBindingFromClick",
@@ -59,6 +76,7 @@
         "LE_ITEM_BIND_ON_USE",
         "LE_ITEM_BIND_QUEST",
         "MathUtil",
+        "MERCHANT_HIGH_PRICE_COST",
         "MerchantBuyBackItem",
         "MerchantFrame",
         "MerchantFrame_ConfirmExtendedItemCost",
@@ -75,6 +93,7 @@
         "NORMAL_FONT_COLOR_CODE",
         "NOT_COLLECTED",
         "NUM_LE_EXPANSION_LEVELS",
+        "PROFESSIONS_COLUMN_REAGENTS_PARTIAL",
         "RESET",
         "RETRIEVING_ITEM_INFO",
         "ScrollUtil",
@@ -85,6 +104,7 @@
         "ShowInspectCursor",
         "SILVER_AMOUNT_SYMBOL",
         "SILVER_AMOUNT_TEXTURE",
+        "SILVER_PER_GOLD",
         "STACKS",
         "StaticPopup_Visible",
         "ToggleDropDownMenu",
@@ -95,7 +115,6 @@
         "UIDROPDOWNMENU_MENU_VALUE",
         "UIDROPDOWNMENU_OPEN_MENU",
         "UIDropDownMenu_SetInitializeFunction",
-        "YES",
-        "PROFESSIONS_COLUMN_REAGENTS_PARTIAL"
+        "YES"
     ]
 }

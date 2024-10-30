@@ -10,7 +10,7 @@ local DressUpMountLink = DressUpMountLink ---@type fun(itemLink: string): boolea
 local GameTooltip_ShowCompareItem = GameTooltip_ShowCompareItem ---@type fun()
 local GetBindingFromClick = GetBindingFromClick ---@type fun(key: string): string
 local GetCurrencyInfo = GetCurrencyInfo ---@type fun(item: string|number): string?, number, string, number, number, number, boolean, number
-local GetItemCount = GetItemCount or C_Item.GetItemCount ---@type fun(itemInfo: ItemInfo, includeBank?: boolean, includeUses?: boolean, includeReagentBank?: boolean): count: number
+local GetItemCount = GetItemCount or C_Item.GetItemCount ---@type fun(itemInfo: ItemInfo, includeBank?: boolean, includeUses?: boolean, includeReagentBank?: boolean, includeAccountBank?: boolean): count: number
 local GetItemInfo = GetItemInfo or C_Item.GetItemInfo ---@type fun(itemInfo: ItemInfo): itemName: string, itemLink: string, itemQuality: Enum.ItemQuality, itemLevel: number, itemMinLevel: number, itemType: string, itemSubType: string, itemStackCount: number, itemEquipLoc: string, itemTexture: fileID, sellPrice: number, classID: number, subclassID: number, bindType: number, expansionID: number, setID: number?, isCraftingReagent: boolean
 local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant  ---@type fun(itemInfo: ItemInfo): itemID: number, itemType: string, itemSubType: string, itemEquipLoc: string, icon: fileID, classID: number, subClassID: number
 -- local GetItemQualityColor = GetItemQualityColor or C_Item.GetItemQualityColor ---@type fun(quality: number): r: number, g: number, b: number, hex: string
@@ -875,6 +875,7 @@ local IsTooltipTextPending do
     ---@param hideVendorPrice? boolean
     ---@return TooltipItem itemData
     function CreateTooltipItem(tooltipData, hyperlinkOrIndex, optionalArg1, optionalArg2, hideVendorPrice)
+        ---@diagnostic disable-next-line: missing-fields
         local itemData = {} ---@type TooltipItem
         Mixin(itemData, TooltipItem)
         itemData:OnLoad(tooltipData, hyperlinkOrIndex, optionalArg1, optionalArg2, hideVendorPrice)
@@ -953,7 +954,7 @@ local TooltipScanner do
                 tooltipData = C_TooltipInfo.GetMerchantItem(index)
             end
         elseif hyperlink or index then
-            tooltipData = self:LegacyGetTooltipData(hyperlink or GetMerchantItemLink(index))
+            tooltipData = self:LegacyGetTooltipData(hyperlink or GetMerchantItemLink(index)) ---@diagnostic disable-line: param-type-mismatch
         end
         if not tooltipData or IsPending(tooltipData) then
             return nil, true
@@ -3079,8 +3080,8 @@ local CompactVendorFrameMerchantStackSplitTemplate do
 
     ---@param maxStack number
     ---@param owner CompactVendorFrameMerchantButtonQuantityTemplate
-    ---@param anchor AnchorPoint
-    ---@param anchorTo AnchorPoint
+    ---@param anchor FramePoint
+    ---@param anchorTo FramePoint
     ---@param stackCount? number
     function CompactVendorFrameMerchantStackSplitTemplate:OpenStackSplitFrame(maxStack, owner, anchor, anchorTo, stackCount)
         if self.owner then
@@ -3330,7 +3331,7 @@ local CompactVendorFrameMerchantIconTemplate do
     }
 
     ---@param self Region
-    ---@param anchor IconShapeMaskAnchor|AnchorPoint[]
+    ---@param anchor IconShapeMaskAnchor|FramePoint[]
     local function UnpackAnchorArgs(self, anchor)
         local anchor1, anchor2, anchor3, anchor4, anchor5 = unpack(anchor) ---@diagnostic disable-line: param-type-mismatch
         if anchor2 == "$parent.Texture" then
@@ -3471,7 +3472,7 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
     ---@param itemLink string
     ---@return number
     local function CountAvailableItems(itemLink)
-        local count = GetItemCount(itemLink, true, false)
+        local count = GetItemCount(itemLink, true, false, true, true)
         if count and count > 0 then
             return count
         end
