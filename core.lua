@@ -3491,14 +3491,20 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
         return count or 0
     end
 
-    local PRICE_FORMAT = "€ %.2f"
-    local TOKEN_COST = 20
+    local PRICE_FORMAT = format("%s %%.2f", "€") -- currency is currently hardcoded to Euro
+    local TOKEN_COST = 20 -- token price is currently hardcoded to 20 Euro
     local PRICE_THRESHOLD = 0.1
+
+    ---@return number? copperPerUnit
     local function GetCopperPerUnit()
         C_WowTokenPublic.UpdateMarketPrice()
         local price = C_WowTokenPublic.GetCurrentMarketPrice()
         if not price then return end
         return TOKEN_COST / price
+    end
+
+    if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
+        GetCopperPerUnit = function() end
     end
 
     ---@alias CompactVendorFrameMerchantButtonCostButtonCostType "Item"|"Money"
@@ -3530,15 +3536,11 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
         elseif self.costType == "Money" and self.price then
             local copperPerUnit = GetCopperPerUnit()
             if copperPerUnit then
-                local realMoney = copperPerUnit * self.price ---@type string|number|nil
-                if realMoney > PRICE_THRESHOLD then
-                    realMoney = format(PRICE_FORMAT, realMoney)
-                else
-                    realMoney = nil
-                end
-                if realMoney then
+                local realMoney = copperPerUnit * self.price
+                local realMoneyText = realMoney > PRICE_THRESHOLD and format(PRICE_FORMAT, realMoney) or nil
+                if realMoneyText then
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:AddLine(realMoney, 1, 1, 1, false)
+                    GameTooltip:AddLine(realMoneyText, 1, 1, 1, false)
                     GameTooltip:Show()
                 end
             end
