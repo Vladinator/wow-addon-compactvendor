@@ -1950,6 +1950,7 @@ local MerchantScanner do
         "OnReady",
     })
 
+    MerchantScanner.merchantOpen = false
     MerchantScanner.collection = {}
 
     MerchantScanner.MERCHANT_REFRESH_INTERVAL = 0.25
@@ -2023,6 +2024,13 @@ local MerchantScanner do
 
     ---@return boolean merchantExists, boolean sameMerchant
     function MerchantScanner:UpdateMerchantInfo()
+        if not self.merchantOpen then
+            self.guid = nil
+            self.name = nil
+            self.isReady = false
+            self:TriggerEvent(self.Event.OnHide)
+            return false, false
+        end
         local guid = self.guid
         self.guid = UnitGUID("npc")
         self.name = UnitName("npc")
@@ -2218,9 +2226,11 @@ local MerchantScanner do
     function MerchantScanner:OnEvent(event, ...)
         if event == "MERCHANT_SHOW" then
             FrameUtil.RegisterFrameForEvents(self, self.Events)
+            self.merchantOpen = true
             self:UpdateMerchant(true)
         elseif event == "MERCHANT_CLOSED" then
             FrameUtil.UnregisterFrameForEvents(self, self.Events)
+            self.merchantOpen = false
             self:UpdateMerchant()
         elseif event == "UNIT_INVENTORY_CHANGED" then
             local unit = ...
@@ -3180,6 +3190,89 @@ local CompactVendorFrameMerchantButtonQuantityTemplate do
         --[[ global ]] CompactVendorFrameMerchantButtonQuantityTemplate.StackSplitFrame = CompactVendorFrameMerchantStackSplitFrame ---@type CompactVendorFrameMerchantStackSplitTemplate
     end)
 
+    ---@type BuyEmAll
+    local BuyEmAll do
+
+        ---@alias BuyEmAll fun(): buyEmAllFrame: BuyEmAllFrame?, buyEmAll: BuyEmAllFunc?
+
+        ---@class BuyEmAllFrame : Frame
+
+        ---@class BuyEmAllAPI
+        ---@field public MerchantItemButton_OnModifiedClick fun(self: BuyEmAllAPI, ...)
+
+        ---@alias BuyEmAllFunc fun(frame: Button, button: mouseButton): success: boolean
+
+        ---@type BuyEmAllFunc?
+        local buyEmAllFunc
+
+        local buyEmAllFuncEnv = setmetatable({
+            IsShiftKeyDown = function() return true end,
+        }, {
+            __index = _G,
+        })
+
+        local hasErrored = false
+
+        ---@type BuyEmAll
+        function BuyEmAll()
+            ---@type BuyEmAllFrame
+            local buyEmAllFrame = _G.BuyEmAllFrame ---@diagnostic disable-line: undefined-field
+            if not buyEmAllFrame or type(buyEmAllFrame) ~= "table" or type(buyEmAllFrame.GetObjectType) ~= "function" then
+                return
+            end
+            ---@type BuyEmAllAPI
+            local buyEmAll = _G.BuyEmAll ---@diagnostic disable-line: undefined-field
+            if not buyEmAll or type(buyEmAll) ~= "table" or type(buyEmAll.MerchantItemButton_OnModifiedClick) ~= "function" then
+                return
+            end
+            if not buyEmAllFunc then
+                ---@type BuyEmAllFunc
+                buyEmAllFunc = function(frame, button)
+                    local func = buyEmAll.MerchantItemButton_OnModifiedClick
+                    func = setfenv(func, buyEmAllFuncEnv)
+                    local success, result = pcall(func, buyEmAll, frame, button)
+                    if not success and not hasErrored then
+                        hasErrored = true
+                        print(addonName, "tried to use BuyEmAll but there was an error:", result)
+                    end
+                    return success
+                end
+            end
+            return buyEmAllFrame, buyEmAllFunc
+        end
+
+    end
+
+    function CompactVendorFrameMerchantButtonQuantityTemplate:Open()
+        ---@type CompactVendorFrameMerchantButtonTemplate
+        local owner = self:GetParent() ---@diagnostic disable-line: assign-type-mismatch
+        local buyEmAllFrame, buyEmAllFunc = BuyEmAll()
+        if buyEmAllFrame and buyEmAllFunc and buyEmAllFunc(owner, "LeftButton") then
+            buyEmAllFrame:SetPoint("BOTTOMLEFT", self, "TOPLEFT", 8, 0)
+            return
+        end
+        self.StackSplitFrame:OpenStackSplitFrame(250, self, "TOPLEFT", "TOPRIGHT")
+        self.StackSplitFrameOwnedBy = owner
+    end
+
+    function CompactVendorFrameMerchantButtonQuantityTemplate:Close()
+        local buyEmAllFrame = BuyEmAll()
+        if buyEmAllFrame then
+            buyEmAllFrame:Hide()
+            return
+        end
+        self.StackSplitFrame:Hide()
+    end
+
+    function CompactVendorFrameMerchantButtonQuantityTemplate:IsOpen()
+        local buyEmAllFrame = BuyEmAll()
+        if buyEmAllFrame then
+            local _, relativeTo = buyEmAllFrame:GetPoint()
+            return self == relativeTo and buyEmAllFrame:IsShown()
+        end
+        return self == self.StackSplitFrame.owner and self.StackSplitFrame:IsShown()
+    end
+
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnLoad()
         self:RegisterForClicks("LeftButtonUp")
         self:GetNormalTexture():SetTexCoord(0.15625, 0.5, 0.84375, 0.5, 0.15625, 0, 0.84375, 0) ---@diagnostic disable-line: undefined-field
@@ -3190,23 +3283,22 @@ local CompactVendorFrameMerchantButtonQuantityTemplate do
     end
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnShow()
-        self.StackSplitFrame:Hide()
+        self:Close()
     end
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnHide()
-        self.StackSplitFrame:Hide()
+        self:Close()
     end
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnClick()
-        if self.StackSplitFrame:IsShown() and self == self.StackSplitFrame.owner then
-            self.StackSplitFrame:Hide()
+        if self:IsOpen() then
+            self:Close()
         else
-            self.StackSplitFrame:OpenStackSplitFrame(250, self, "TOPLEFT", "TOPRIGHT")
-            ---@diagnostic disable-next-line: assign-type-mismatch
-            self.StackSplitFrameOwnedBy = self:GetParent() ---@type CompactVendorFrameMerchantButtonTemplate?
+            self:Open()
         end
     end
 
+    ---@param quantity? number
     function CompactVendorFrameMerchantButtonQuantityTemplate:StackSplitFrameCallback(quantity)
         if not self.StackSplitFrameOwnedBy or not quantity then
             return
