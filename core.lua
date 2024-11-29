@@ -471,9 +471,11 @@ local IsTransmogCollected do
         INVTYPE_TRINKET = true,
     }
 
-    ---@param itemLinkOrID string|number
-    ---@return boolean? canTransmog
-    function CanTransmogItem(itemLinkOrID)
+    ---@alias CompactVendorCanTransmogItem fun(itemLinkOrID: string|number): canTransmog: boolean?
+    ---@alias CompactVendorIsTransmogCollected fun(itemLink: string): canCollect: boolean?, isCollected: boolean?
+
+    ---@type CompactVendorCanTransmogItem
+    local function DefaultCanTransmogItem(itemLinkOrID)
         if not itemLinkOrID then
             return
         end
@@ -494,9 +496,8 @@ local IsTransmogCollected do
         return true
     end
 
-    ---@param itemLink string
-    ---@return boolean? canCollect, boolean? isCollected
-    function IsTransmogCollected(itemLink)
+    ---@type CompactVendorIsTransmogCollected
+    local function DefaultIsTransmogCollected(itemLink)
         if type(itemLink) ~= "string" then
             return
         end
@@ -513,6 +514,61 @@ local IsTransmogCollected do
         end
         local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
         return true, isCollected
+    end
+
+    CanTransmogItem = DefaultCanTransmogItem
+    IsTransmogCollected = DefaultIsTransmogCollected
+
+    -- Support CanIMogIt when available as it does things a bit more accurately than the built-in API when used plainly as we do...
+    if select(4, C_AddOns.GetAddOnInfo("CanIMogIt")) then
+
+        local function isReady()
+            return type(CanIMogIt) == "table" and type(CanIMogIt.IsTransmogable) == "function" and type(CanIMogIt.PlayerKnowsTransmog) == "function"
+        end
+
+        local function replaceAPI()
+
+            ---@type CompactVendorCanTransmogItem
+            function CanTransmogItem(itemLinkOrID)
+                if not itemLinkOrID then
+                    return
+                end
+                local success, canTransmog = pcall(CanIMogIt.IsTransmogable, CanIMogIt, itemLinkOrID)
+                if not success then
+                    return DefaultCanTransmogItem(itemLinkOrID)
+                end
+                return canTransmog
+            end
+
+            ---@type CompactVendorIsTransmogCollected
+            function IsTransmogCollected(itemLink)
+                if not itemLink then
+                    return
+                end
+                if not CanTransmogItem(itemLink) then
+                    return false
+                end
+                local success, isCollected = pcall(CanIMogIt.PlayerKnowsTransmog, CanIMogIt, itemLink)
+                if not success then
+                    return DefaultIsTransmogCollected(itemLink)
+                end
+                return true, isCollected
+            end
+
+        end
+
+        if isReady() then
+            replaceAPI()
+        else
+            local frame = CreateFrame("Frame")
+            frame:RegisterEvent("ADDON_LOADED")
+            frame:SetScript("OnEvent", function(self, event)
+                if not isReady() then return end
+                self:UnregisterEvent(event)
+                replaceAPI()
+            end)
+        end
+
     end
 
 end
