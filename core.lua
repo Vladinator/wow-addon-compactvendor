@@ -389,7 +389,7 @@ local ConvertToPattern do
         local silver = floor((money - (gold * goldInt)) / COPPER_PER_SILVER)
         local copper = mod(money, COPPER_PER_SILVER)
         local goldFormat, silverFormat, copperFormat
-        local colorBlind = ENABLE_COLORBLIND_MODE == "1"
+        local colorBlind = C_CVar.GetCVarBool("colorblindMode") or ENABLE_COLORBLIND_MODE == "1"
         if noIcons or colorBlind then
             if not noDenominator or colorBlind then
                 goldFormat, silverFormat, copperFormat = separateThousands and MoneyFormat.GOLD_TS or MoneyFormat.GOLD, MoneyFormat.SILVER, MoneyFormat.COPPER
