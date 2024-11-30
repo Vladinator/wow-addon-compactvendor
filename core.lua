@@ -469,6 +469,11 @@ local IsTransmogCollected do
         INVTYPE_NECK = true,
         INVTYPE_FINGER = true,
         INVTYPE_TRINKET = true,
+        INVTYPE_BAG = true,
+        INVTYPE_AMMO = true,
+        INVTYPE_THROWN = true,
+        INVTYPE_QUIVER = true,
+        INVTYPE_RELIC = true,
     }
 
     ---@alias CompactVendorCanTransmogItem fun(itemLinkOrID: string|number): canTransmog: boolean?
@@ -508,6 +513,9 @@ local IsTransmogCollected do
             return false
         end
         local _, sourceID = C_TransmogCollection.GetItemInfo(itemLink)
+        if not sourceID and not C_TransmogCollection.PlayerHasTransmogByItemInfo then
+            return false
+        end
         if not sourceID then
             local isCollected = C_TransmogCollection.PlayerHasTransmogByItemInfo(itemLink)
             return true, isCollected
