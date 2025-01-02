@@ -580,6 +580,11 @@ local IsTransmogCollected do
 
     end
 
+    if WOW_PROJECT_ID == WOW_PROJECT_CLASSIC then
+        CanTransmogItem = function() end
+        IsTransmogCollected = function() end
+    end
+
 end
 
 local IsCosmeticBundleCollected do
@@ -1547,7 +1552,6 @@ local UpdateMerchantItemButton do
     function MerchantItem:OnLoad(parent, index)
         self.parent = parent
         self.index = index
-print("CREATE", index, "") -- DEBUG
         self.extendedCostItems = {}
         self:Refresh()
     end
