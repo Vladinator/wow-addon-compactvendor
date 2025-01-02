@@ -29,6 +29,7 @@ local CompactVendorFilterButtonTemplate do
     ---@field public Icon Texture
     ---@field public All Texture
 
+    ---@class CompactVendorFilterButtonTemplate
     CompactVendorFilterButtonTemplate = {}
     _G.CompactVendorFilterButtonTemplate = CompactVendorFilterButtonTemplate
 
@@ -73,6 +74,7 @@ local CompactVendorFilterFrameTemplate do
 
     ---@class CompactVendorFilterFrameTemplate : Frame
 
+    ---@class CompactVendorFilterFrameTemplate
     CompactVendorFilterFrameTemplate = {}
     _G.CompactVendorFilterFrameTemplate = CompactVendorFilterFrameTemplate
 
@@ -288,6 +290,7 @@ local CompactVendorFilterTemplate do
     ---@field public name string
     ---@field public defaults CompactVendorFilterTemplateDefaults
 
+    ---@class CompactVendorFilterTemplate
     CompactVendorFilterTemplate = {}
     _G.CompactVendorFilterTemplate = CompactVendorFilterTemplate
 
@@ -367,6 +370,7 @@ local CompactVendorFilterToggleTemplate do
     ---@field public isLogicReversed? boolean
     ---@field public isCheckLogicReversed? boolean
 
+    ---@class CompactVendorFilterToggleTemplate
     CompactVendorFilterToggleTemplate = {}
     _G.CompactVendorFilterToggleTemplate = CompactVendorFilterToggleTemplate
 
@@ -503,6 +507,7 @@ local CompactVendorFilterDropDownTemplate do
     ---@field public hasValue CompactVendorFilterDropDownTemplateHasValue?
     ---@field public isAccumulative boolean?
 
+    ---@class CompactVendorFilterDropDownTemplate
     CompactVendorFilterDropDownTemplate = {}
     _G.CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate
 
@@ -692,6 +697,7 @@ local CompactVendorFilterDropDownWrapperTemplate do
     ---@class CompactVendorFilterDropDownWrapperTemplate : CompactVendorFilterDropDownTemplate
     ---@field public valueIsLocaleKey boolean?
 
+    ---@class CompactVendorFilterDropDownWrapperTemplate
     CompactVendorFilterDropDownWrapperTemplate = {}
     _G.CompactVendorFilterDropDownWrapperTemplate = CompactVendorFilterDropDownWrapperTemplate
 
@@ -753,6 +759,7 @@ local CompactVendorFilterDropDownToggleWrapperTemplate do
     ---@field public getValueText? CompactVendorFilterDropDownToggleWrapperTemplateGetValueText
     ---@field public isYesNo? boolean
 
+    ---@class CompactVendorFilterDropDownToggleWrapperTemplate
     CompactVendorFilterDropDownToggleWrapperTemplate = {}
     _G.CompactVendorFilterDropDownToggleWrapperTemplate = CompactVendorFilterDropDownToggleWrapperTemplate
 

@@ -14,6 +14,7 @@ local GetItemCount = GetItemCount or C_Item.GetItemCount ---@type fun(itemInfo: 
 local GetItemInfo = GetItemInfo or C_Item.GetItemInfo ---@type fun(itemInfo: ItemInfo): itemName: string, itemLink: string, itemQuality: Enum.ItemQuality, itemLevel: number, itemMinLevel: number, itemType: string, itemSubType: string, itemStackCount: number, itemEquipLoc: string, itemTexture: fileID, sellPrice: number, classID: number, subclassID: number, bindType: number, expansionID: number, setID: number?, isCraftingReagent: boolean
 local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant  ---@type fun(itemInfo: ItemInfo): itemID: number, itemType: string, itemSubType: string, itemEquipLoc: string, icon: fileID, classID: number, subClassID: number
 -- local GetItemQualityColor = GetItemQualityColor or C_Item.GetItemQualityColor ---@type fun(quality: number): r: number, g: number, b: number, hex: string
+local GetMerchantItemInfo = GetMerchantItemInfo or C_MerchantFrame.GetItemInfo ---@type fun(index: number): MerchantItemInfo|string|nil
 local HandleModifiedItemClick = HandleModifiedItemClick ---@type fun(itemLink: string): boolean
 local IsCosmeticItem = IsCosmeticItem or C_Item.IsCosmeticItem ---@type fun(item: string|number): boolean
 local IsDressableItemByID = IsDressableItem or C_Item.IsDressableItemByID ---@type fun(item: string|number): boolean
@@ -1484,7 +1485,7 @@ local UpdateMerchantItemButton do
     ---@field public numAvailable number
     ---@field public isPurchasable boolean
     ---@field public isUsable boolean
-    ---@field public extendedCost number
+    ---@field public extendedCost? boolean
     ---@field public currencyID? number
     ---@field public spellID? number
     ---@field public canAfford boolean
@@ -1546,6 +1547,7 @@ local UpdateMerchantItemButton do
     function MerchantItem:OnLoad(parent, index)
         self.parent = parent
         self.index = index
+print("CREATE", index, "") -- DEBUG
         self.extendedCostItems = {}
         self:Refresh()
     end
@@ -1619,9 +1621,28 @@ local UpdateMerchantItemButton do
         return self.numAvailable and self.numAvailable > 0
     end
 
+    ---@return string? name, number|string texture, number price, number stackCount, number numAvailable, boolean isPurchasable, boolean isUsable, boolean? hasExtendedCost, number? currencyID, number? spellID
+    function MerchantItem:GetMerchantItemInfo()
+        local index = self:GetIndex()
+        local temp = {GetMerchantItemInfo(index)}
+        local arg1 = temp[1]
+        if not arg1 then
+            return ---@diagnostic disable-line: missing-return-value
+        end
+        local info = type(arg1) == "table" and arg1 or nil
+        if info then
+            return info.name, info.texture, info.price, info.stackCount, info.numAvailable, info.isPurchasable, info.isUsable, info.hasExtendedCost, info.currencyID, info.spellID
+        end
+        return temp[1], temp[2], temp[3], temp[4], temp[5], temp[6], temp[7], temp[8], temp[9], temp[10] ---@diagnostic disable-line: return-type-mismatch
+    end
+
     function MerchantItem:Refresh()
         local index = self:GetIndex()
-        self.name, self.texture, self.price, self.stackCount, self.numAvailable, self.isPurchasable, self.isUsable, self.extendedCost, self.currencyID, self.spellID = GetMerchantItemInfo(index) ---@diagnostic disable-line: assign-type-mismatch
+        self.name, self.texture, self.price, self.stackCount, self.numAvailable, self.isPurchasable, self.isUsable, self.extendedCost, self.currencyID, self.spellID = self:GetMerchantItemInfo()
+        if not self.name then
+            self:Reset()
+            return
+        end
         if self.currencyID then
             self.name, self.texture, self.numAvailable, self.quality = GetCurrencyContainerInfo(self.currencyID, self.numAvailable, self.name, self.texture, nil)
         end
@@ -2121,11 +2142,16 @@ local MerchantScanner do
         return a.index < b.index
     end
 
+    ---@type MerchantItem[]
+    MerchantScanner.activeItems = {}
+
     local function GetActiveItems()
-        local activeItems = {} ---@type MerchantItem[]
+        local activeItems = MerchantScanner.activeItems
+        table.wipe(activeItems)
         local index = 0
         for activeItem in MerchantScanner.itemPool:EnumerateActive() do
             index = index + 1
+            activeItem.index = activeItem.index or 0 -- HOTFIX: odd bug with rune vendor on SOD where the active item has no index?
             activeItems[index] = activeItem
         end
         if index > 1 then
@@ -2255,13 +2281,9 @@ local MerchantScanner do
         if isReset == true then
             return
         end
-        local index = 0
-        for itemData in self.itemPool:EnumerateActive() do
-            index = index + 1
-            collection[index] = itemData
-        end
-        if index > 1 then
-            table.sort(collection, SortCollectionByIndex)
+        local activeItems = GetActiveItems()
+        for index, activeItem in ipairs(activeItems) do
+            collection[index] = activeItem
         end
     end
 
@@ -4019,7 +4041,7 @@ local CompactVendorFrameMerchantButtonTemplate do
     ---@param color number[]
     function CompactVendorFrameMerchantButtonTemplate:SetBackgroundColor(color)
         self.backgroundColor = color
-        self.Bg:SetGradient("HORIZONTAL", { r = color[1], g = color[2], b = color[3], a = color[4] }, { r = color[5], g = color[6], b = color[7], a = color[8] })
+        self.Bg:SetGradient("HORIZONTAL", CreateColor(color[1], color[2], color[3], color[4]), CreateColor(color[5], color[6], color[7], color[8]))
     end
 
     ---@param color SimpleColor
