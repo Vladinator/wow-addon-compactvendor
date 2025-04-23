@@ -334,6 +334,8 @@ local ConvertToPattern do
     ---@param itemLink string
     ---@return number? quality
     function GetQualityFromLink(itemLink)
+        local id = itemLink:match("|cnIQ(%d+):|")
+        if id then return tonumber(id) end
         local hex = itemLink:match("|c([a-fA-F0-9]+)|")
         return hex and ItemHexColorToQualityIndex[hex]
     end
@@ -3798,7 +3800,7 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
                     local itemNumAvailable = CountAvailableItems(costItem.itemLink)
                     local canAfford = itemNumAvailable - costItem.count >= 0
                     local text = costItem.count > 1 and costItem.count or "" -- FormatLargeNumber(costItem.count)
-                    cost:Update(costType, canAfford, text, costItem.texture, costItem.count, costItem.itemLink, costItem.quality,costItem.name)
+                    cost:Update(costType, canAfford, text, costItem.texture, costItem.count, costItem.itemLink, costItem.quality, costItem.name)
                 else
                     return false
                 end
