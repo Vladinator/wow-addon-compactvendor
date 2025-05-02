@@ -2191,6 +2191,13 @@ local MerchantScanner do
                 end
             end
         end
+        if not isFullUpdate and activeItems and numMerchantItems < #activeItems then
+            -- It's possible to end up with more items in the pool than we currently need. So we need to clean them up. #31
+            for index = numMerchantItems+1, #activeItems do
+                self.itemPool:Release(activeItems[index])
+            end
+        end
+
         self:UpdateCollection()
         if pending == 0 and not self.isReady then
             self.isReady = true
