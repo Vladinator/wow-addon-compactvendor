@@ -1550,10 +1550,9 @@ local UpdateMerchantItemButton do
     }
 
     ---@param parent MerchantScanner
-    ---@param index number
-    function MerchantItem:OnLoad(parent, index)
+    function MerchantItem:OnLoad(parent)
         self.parent = parent
-        self.index = index
+        self.index = 0
         self.extendedCostItems = {}
         self:Refresh()
     end
@@ -1575,6 +1574,7 @@ local UpdateMerchantItemButton do
             end
         end
         ResetTableContents(self)
+        self.index = 0
         self.qualityColor = nil
         self.tooltipData = nil
         self.canLearnRequirement = nil
@@ -1882,11 +1882,10 @@ local UpdateMerchantItemButton do
     end
 
     ---@param parent MerchantScanner
-    ---@param index number
     ---@return MerchantItem itemData
-    function CreateMerchantItem(parent, index)
+    function CreateMerchantItem(parent)
         local itemData = Mixin({}, MerchantItem) ---@type MerchantItem
-        itemData:OnLoad(parent, index)
+        itemData:OnLoad(parent)
         return itemData
     end
 
@@ -2057,13 +2056,10 @@ local MerchantScanner do
     ---@field public Acquire fun(self: ObjectPool): ObjectPoolObject, boolean
     ---@field public Release fun(self: ObjectPool, object: ObjectPoolObject): boolean
     ---@field public ReleaseAll fun(self: ObjectPool)
-    ---@field public SetResetDisallowedIfNew fun(self: ObjectPool, disallowed: boolean)
     ---@field public EnumerateActive fun(self: ObjectPool): fun(): ObjectPoolObject
     ---@field public GetNextActive fun(self: ObjectPool, current: ObjectPoolObject): fun(): ObjectPoolObject
-    ---@field public GetNextInactive fun(self: ObjectPool, current: ObjectPoolObject): fun(): ObjectPoolObject
     ---@field public IsActive fun(self: ObjectPool, object: ObjectPoolObject): boolean
     ---@field public GetNumActive fun(self: ObjectPool): number
-    ---@field public EnumerateInactive fun(self: ObjectPool): fun(): ObjectPoolObject
 
     ---@alias FramePoolObject CompactVendorFrameMerchantButtonTemplate
     ---@alias FramePoolCreate fun(pool: FramePool): FramePoolObject
@@ -2073,12 +2069,14 @@ local MerchantScanner do
     ---@class FramePool : ObjectPool
     ---@field public Acquire fun(self: FramePool): FramePoolObject, boolean
     ---@field public Release fun(self: FramePool, object: FramePoolObject): boolean
+    ---@field public ReleaseAll fun(self: FramePool)
     ---@field public EnumerateActive fun(self: FramePool): fun(): FramePoolObject
     ---@field public GetNextActive fun(self: FramePool, current: FramePoolObject): fun(): FramePoolObject
     ---@field public GetNextInactive fun(self: FramePool, current: FramePoolObject): fun(): FramePoolObject
     ---@field public IsActive fun(self: FramePool, object: FramePoolObject): boolean
     ---@field public EnumerateInactive fun(self: FramePool): fun(): FramePoolObject
     ---@field public GetTemplate fun(self: FramePool): string?
+    ---@field public SetResetDisallowedIfNew fun(self: FramePool, disallowed: boolean)
 
     ---@class MerchantItemFramePool : FramePool
 
@@ -2090,18 +2088,16 @@ local MerchantScanner do
     ---@class MerchantItemPool : ObjectPool
     ---@field public Acquire fun(self: MerchantItemPool): MerchantItemPoolObject, boolean
     ---@field public Release fun(self: MerchantItemPool, object: MerchantItemPoolObject): boolean
+    ---@field public ReleaseAll fun(self: MerchantItemPool)
     ---@field public EnumerateActive fun(self: MerchantItemPool): fun(): MerchantItemPoolObject
     ---@field public GetNextActive fun(self: MerchantItemPool, current: MerchantItemPoolObject): fun(): MerchantItemPoolObject
-    ---@field public GetNextInactive fun(self: MerchantItemPool, current: MerchantItemPoolObject): fun(): MerchantItemPoolObject
     ---@field public IsActive fun(self: MerchantItemPool, object: MerchantItemPoolObject): boolean
-    ---@field public EnumerateInactive fun(self: MerchantItemPool): fun(): MerchantItemPoolObject
 
     ---@type MerchantItemPool
     MerchantScanner.itemPool = CreateObjectPool(
         ---@param pool MerchantItemPool
         function(pool)
-            local index = pool:GetNumActive() + 1
-            return CreateMerchantItem(MerchantScanner, index)
+            return CreateMerchantItem(MerchantScanner)
         end,
         ---@param pool MerchantItemPool
         ---@param self MerchantItemPoolObject
@@ -2151,19 +2147,37 @@ local MerchantScanner do
     ---@type MerchantItem[]
     MerchantScanner.activeItems = {}
 
-    local function GetActiveItems()
-        local activeItems = MerchantScanner.activeItems
-        table.wipe(activeItems)
-        local index = 0
-        for activeItem in MerchantScanner.itemPool:EnumerateActive() do
-            index = index + 1
-            activeItem.index = activeItem.index or 0 -- HOTFIX: odd bug with rune vendor on SOD where the active item has no index?
-            activeItems[index] = activeItem
+    ---@param numMerchantItems? number
+    local function GetActiveItems(numMerchantItems)
+        local items = MerchantScanner.activeItems
+        table.wipe(items)
+        local count = 0
+        for item in MerchantScanner.itemPool:EnumerateActive() do
+            count = count + 1
+            items[count] = item
         end
-        if index > 1 then
-            table.sort(activeItems, SortCollectionByIndex)
+        if count > 1 then
+            table.sort(items, SortCollectionByIndex)
         end
-        return activeItems
+        if numMerchantItems then
+            local sort = false
+            for i = count + 1, numMerchantItems do
+                local item = items[i]
+                if not item then
+                    item = MerchantScanner.itemPool:Acquire()
+                    items[i] = item
+                    sort = true
+                end
+            end
+            for i = numMerchantItems + 1, #items do
+                local item = items[i]
+                MerchantScanner.itemPool:Release(item)
+            end
+            if sort and numMerchantItems > 1 then
+                table.sort(items, SortCollectionByIndex)
+            end
+        end
+        return items
     end
 
     ---@param isFullUpdate? boolean
@@ -2179,10 +2193,10 @@ local MerchantScanner do
             self.itemPool:ReleaseAll()
         end
         local numMerchantItems = GetMerchantNumItems()
-        local activeItems = numMerchantItems > 0 and GetActiveItems()
+        local activeItems = GetActiveItems(numMerchantItems)
         local pending = 0
         for index = 1, numMerchantItems do
-            local itemData = activeItems and activeItems[index] or self.itemPool:Acquire()
+            local itemData = activeItems[index]
             if itemData:IsDirty(index) or isFullUpdate == true or itemData:HasLimitedAvailability() or (predicate and predicate(itemData)) then
                 pending = pending + 1
                 itemData:Refresh()
@@ -2970,6 +2984,13 @@ local Frame do
 
         frame:OnLoad()
         frame:SetScript("OnEvent", frame.OnEvent)
+
+        local function refreshFilters()
+            frame:Refresh()
+        end
+
+        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnShow, refreshFilters)
+        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, refreshFilters)
 
     end
 
