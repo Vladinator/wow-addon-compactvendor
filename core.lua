@@ -1660,8 +1660,8 @@ local UpdateMerchantItemButton do
         else
             self.costType = MerchantItemCostType.Gold
         end
-        self.itemLink = GetMerchantItemLink(index)---@diagnostic disable-line: assign-type-mismatch
-        self.merchantItemID = GetMerchantItemID(index)---@diagnostic disable-line: assign-type-mismatch
+        self.itemLink = GetMerchantItemLink(index)
+        self.merchantItemID = GetMerchantItemID(index)
         self.itemLinkOrID = self.itemLink or self.merchantItemID
         self.isHeirloom = self.merchantItemID and C_Heirloom and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
         self.isKnownHeirloom = self.isHeirloom and C_Heirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
@@ -1708,10 +1708,8 @@ local UpdateMerchantItemButton do
         if not self.craftedStars and self.itemLink then
             self.craftedStars, self.craftedStarsMarkup = GetCraftedStarsFromLink(self.itemLink)
         end
-        if not self.quality and self.itemLink then
-            self.quality = GetQualityFromLink(self.itemLink)
-        end
-        if not self.qualityColor and self.quality then
+        if self.itemLink then
+            self.quality = GetQualityFromLink(self.itemLink) or self.quality
             self.qualityColor = GetColorFromQuality(self.quality)
         end
         if not self.itemLinkOrID then
@@ -1953,16 +1951,12 @@ local UpdateMerchantItemButton do
         button.Quantity:SetShown(canSelectQuantity)
     end
 
-    ---@param button? CompactVendorFrameMerchantButtonTemplate
+    ---@param button CompactVendorFrameMerchantButtonTemplate
     ---@param merchantItem? MerchantItem
     ---@return CompactVendorFrameMerchantButtonTemplate merchantButton
     function CreateMerchantItemButton(button, merchantItem)
-        local merchantButton = button or CreateFrame("Button") ---@class CompactVendorFrameMerchantButtonTemplate
-        if not merchantButton.isInitialized then
-            merchantButton.isInitialized = true
-        end
-        UpdateMerchantItemButton(merchantButton, merchantItem)
-        return merchantButton
+        UpdateMerchantItemButton(button, merchantItem)
+        return button
     end
 
 end
