@@ -25,7 +25,6 @@ local SearchBoxTemplate_OnTextChanged = SearchBoxTemplate_OnTextChanged ---@type
 local ShowInspectCursor = ShowInspectCursor ---@type fun()
 local StaticPopup_Visible = StaticPopup_Visible ---@type fun(name: string): any, any
 local CallbackRegistryMixin = CallbackRegistryMixin ---@type CallbackRegistry
-local FrameUtil = FrameUtil ---@type table<any, any>
 local MathUtil = MathUtil ---@type table<any, any>
 local ScrollUtil = ScrollUtil ---@type table<any, any>
 local TooltipUtil = TooltipUtil ---@type table<any, any>
@@ -40,6 +39,31 @@ local addonName, ---@type string CompactVendor
     ns = ... ---@class CompactVendorNS
 
 local IS_TWW = select(4, GetBuildInfo()) >= 110000
+
+local FrameUtil
+do
+
+    ---@class CompactVendorFrameUtil
+    FrameUtil = {}
+    ns.FrameUtil = FrameUtil
+
+    ---@param self Frame
+    ---@param events WowEvent[]
+    function FrameUtil.RegisterFrameForEvents(self, events)
+        for _, event in ipairs(events) do
+            pcall(self.RegisterEvent, self, event)
+        end
+    end
+
+    ---@param self Frame
+    ---@param events WowEvent[]
+    function FrameUtil.UnregisterFrameForEvents(self, events)
+        for _, event in ipairs(events) do
+            pcall(self.UnregisterEvent, self, event)
+        end
+    end
+
+end
 
 local CompactVendorDBDefaults ---@class CompactVendorDBDefaults
 local ListItemScaleToFontObject
@@ -3969,6 +3993,12 @@ local CompactVendorFrameMerchantButtonTemplate do
     CompactVendorFrameMerchantButtonTemplate = {} ---@class CompactVendorFrameMerchantButtonTemplate
     _G.CompactVendorFrameMerchantButtonTemplate = CompactVendorFrameMerchantButtonTemplate
 
+    ---@type WowEvent[]
+    CompactVendorFrameMerchantButtonTemplate.Events = {
+        "BAG_UPDATE_DELAYED",
+        "CURRENCY_DISPLAY_UPDATE",
+    }
+
     function CompactVendorFrameMerchantButtonTemplate:OnLoad()
         self:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     end
@@ -3977,13 +4007,31 @@ local CompactVendorFrameMerchantButtonTemplate do
         UpdateMerchantItemButton(self, self.merchantItem)
         self:UpdateTextSize()
         self:UpdateIconShape()
+        FrameUtil.RegisterFrameForEvents(self, self.Events)
     end
 
     function CompactVendorFrameMerchantButtonTemplate:OnHide()
         self.merchantItem = nil
+        FrameUtil.UnregisterFrameForEvents(self, self.Events)
     end
 
-    function CompactVendorFrameMerchantButtonTemplate:OnEvent()
+    ---@param event WowEvent
+    function CompactVendorFrameMerchantButtonTemplate:OnEvent(event, ...)
+        local function update()
+            if self.merchantItem then
+                self.merchantItem:Refresh()
+            end
+            UpdateMerchantItemButton(self, self.merchantItem)
+        end
+        if event == "BAG_UPDATE_DELAYED" then
+            update()
+        elseif event == "CURRENCY_DISPLAY_UPDATE" then
+            ---@type number?, number?, number?, Enum.CurrencySource?, Enum.CurrencyDestroyReason?
+            local currencyType, quantity, quantityChange, quantityGainSource, destroyReason = ...
+            if currencyType == nil then
+                update()
+            end
+        end
     end
 
     function CompactVendorFrameMerchantButtonTemplate:OnEnter()

@@ -45,7 +45,6 @@
         "EQUIPMENT_SETS",
         "ERR_COSMETIC_KNOWN",
         "FONT_COLOR_CODE_CLOSE",
-        "FrameUtil",
         "GameTooltip_ShowCompareItem",
         "GetBindingFromClick",
         "GetCurrencyInfo",
