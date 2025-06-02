@@ -1467,7 +1467,8 @@ end
 
 local CreateMerchantItem
 local CreateMerchantItemButton
-local UpdateMerchantItemButton do
+local UpdateMerchantItemButton
+local RefreshAndUpdateMerchantItemButton do
 
     ---@enum MerchantItemCostType
     local MerchantItemCostType = {
@@ -1977,9 +1978,21 @@ local UpdateMerchantItemButton do
 
     ---@param button CompactVendorFrameMerchantButtonTemplate
     ---@param merchantItem? MerchantItem
+    function RefreshAndUpdateMerchantItemButton(button, merchantItem)
+        if not merchantItem then
+            merchantItem = button.merchantItem
+        end
+        if merchantItem then
+            merchantItem:Refresh()
+        end
+        UpdateMerchantItemButton(button, merchantItem)
+    end
+
+    ---@param button CompactVendorFrameMerchantButtonTemplate
+    ---@param merchantItem? MerchantItem
     ---@return CompactVendorFrameMerchantButtonTemplate merchantButton
     function CreateMerchantItemButton(button, merchantItem)
-        UpdateMerchantItemButton(button, merchantItem)
+        RefreshAndUpdateMerchantItemButton(button, merchantItem)
         return button
     end
 
@@ -4004,7 +4017,7 @@ local CompactVendorFrameMerchantButtonTemplate do
     end
 
     function CompactVendorFrameMerchantButtonTemplate:OnShow()
-        UpdateMerchantItemButton(self, self.merchantItem)
+        RefreshAndUpdateMerchantItemButton(self)
         self:UpdateTextSize()
         self:UpdateIconShape()
         FrameUtil.RegisterFrameForEvents(self, self.Events)
@@ -4018,10 +4031,7 @@ local CompactVendorFrameMerchantButtonTemplate do
     ---@param event WowEvent
     function CompactVendorFrameMerchantButtonTemplate:OnEvent(event, ...)
         local function update()
-            if self.merchantItem then
-                self.merchantItem:Refresh()
-            end
-            UpdateMerchantItemButton(self, self.merchantItem)
+            RefreshAndUpdateMerchantItemButton(self)
         end
         if event == "BAG_UPDATE_DELAYED" then
             update()
