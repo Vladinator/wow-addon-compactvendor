@@ -1,5 +1,3 @@
-local GetItemStats = GetItemStats or C_Item.GetItemStats
-
 local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate ---@type CompactVendorFilterDropDownTemplate
 
 ---@alias StatTablePolyfill table<string, number>
@@ -12,7 +10,10 @@ local statTable = {}
 local function UpdateItemStatTable(itemLink)
     if C_Item.GetItemStats then
         statTable = C_Item.GetItemStats(itemLink)
-    elseif GetItemStats then
+        return statTable
+    end
+    local GetItemStats = GetItemStats ---@diagnostic disable-line: undefined-global
+    if GetItemStats then
         if statTable then
             table.wipe(statTable)
         end
@@ -44,7 +45,7 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         for value, _ in pairs(values) do
             local option = self:GetOption(value)
             if not option then
-                option = {} ---@diagnostic disable-line: missing-fields
+                option = { text = "" }
                 options[#options + 1] = option
             end
             option.value = value
@@ -64,12 +65,8 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         if not itemValue then
             return
         end
-        for statKey, _ in pairs(itemValue) do
-            if statKey == value then
-                return false
-            end
-        end
-        return true
+        local statValue = itemValue[value]
+        return statValue == nil
     end,
     true
 )

@@ -1,4 +1,4 @@
-local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded ---@diagnostic disable-line: deprecated
+local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded ---@diagnostic disable-line: undefined-global
 
 local ns = select(2, ...) ---@type CompactVendorNS
 local FrameUtil = ns.FrameUtil
@@ -97,8 +97,8 @@ local CompactVendorFilterFrameTemplate do
         self:Hide()
         FrameUtil.RegisterFrameForEvents(self, self.Events)
         self.Filters = {} ---@type table<string, CompactVendorFilterTemplate>
-        ---@diagnostic disable-next-line: missing-fields
-        self.DropdownInfo = {} ---@type DropdownInfoPolyfill
+        ---@diagnostic disable-next-line: assign-type-mismatch
+        self.DropdownInfo = { text = nil, func = nil } ---@type DropdownInfoPolyfill
         self.DropdownSortedFilters = {} ---@type string[]
         self.VendorOpen = false
         self.VendorUpdating = false
@@ -446,8 +446,8 @@ local CompactVendorFilterToggleTemplate do
         if level ~= 1 then
             return
         end
-        ---@diagnostic disable-next-line: missing-fields
-        local info = {} ---@type DropdownInfoPolyfill
+        ---@diagnostic disable-next-line: assign-type-mismatch
+        local info = { text = nil, func = nil } ---@type DropdownInfoPolyfill
         info.keepShownOnClick = true
         info.isNotRadio = true
         info.text = self.name
@@ -497,6 +497,7 @@ local CompactVendorFilterDropDownTemplate do
     ---@field public index number?
     ---@field public value any
     ---@field public text string
+    ---@field public func fun(self: Button, arg1: any?, arg2: any?, checked :boolean?, mouseButton: string?)?
     ---@field public show boolean?
     ---@field public checked boolean?
 
@@ -598,8 +599,8 @@ local CompactVendorFilterDropDownTemplate do
     ---@param level number
     function CompactVendorFilterDropDownTemplate:GetDropdown(level)
         if level == 1 then
-            ---@diagnostic disable-next-line: missing-fields
-            local info = {} ---@type DropdownInfoPolyfill
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            local info = { text = nil, func = nil } ---@type DropdownInfoPolyfill
             info.keepShownOnClick = true
             info.isNotRadio = true
             info.text = self.name
@@ -620,8 +621,8 @@ local CompactVendorFilterDropDownTemplate do
             end
             UIDropDownMenu_AddButton(info, level)
         elseif level == 2 and self.name == UIDROPDOWNMENU_MENU_VALUE then
-            ---@diagnostic disable-next-line: missing-fields
-            local info = {} ---@type DropdownInfoPolyfill
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            local info = { text = nil, func = nil } ---@type DropdownInfoPolyfill
             info.keepShownOnClick = true
             info.isNotRadio = true
             for _, option in ipairs(self.options) do

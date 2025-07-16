@@ -1,3 +1,5 @@
+---@diagnostic disable: deprecated
+
 local BagSearch_OnChar = BagSearch_OnChar ---@type fun(self: EditBox)
 local BagSearch_OnTextChanged = BagSearch_OnTextChanged ---@type fun(self: EditBox)
 local CreateDataProvider = CreateDataProvider ---@type fun()
@@ -24,7 +26,7 @@ local SearchBoxTemplate_OnLoad = SearchBoxTemplate_OnLoad ---@type fun(self: Edi
 local SearchBoxTemplate_OnTextChanged = SearchBoxTemplate_OnTextChanged ---@type fun(self: EditBox)
 local ShowInspectCursor = ShowInspectCursor ---@type fun()
 local StaticPopup_Visible = StaticPopup_Visible ---@type fun(name: string): any, any
-local CallbackRegistryMixin = CallbackRegistryMixin ---@type CallbackRegistry
+local CallbackRegistryMixin = CallbackRegistryMixin ---@class CallbackRegistryMixinPolyfill : CallbackRegistry, CallbackRegistryMixin
 local MathUtil = MathUtil ---@type table<any, any>
 local ScrollUtil = ScrollUtil ---@type table<any, any>
 local TooltipUtil = TooltipUtil ---@type table<any, any>
@@ -1707,8 +1709,8 @@ local RefreshAndUpdateMerchantItemButton do
         for i = 1, self.extendedCostCount do
             local costItem = self.extendedCostItems[i]
             if not costItem then
-                ---@diagnostic disable-next-line: missing-fields
-                costItem = {} ---@type MerchantItemCostItem
+                ---@diagnostic disable-next-line: assign-type-mismatch
+                costItem = { count = nil } ---@type MerchantItemCostItem
                 self.extendedCostItems[i] = costItem
             end
             costItem.texture,

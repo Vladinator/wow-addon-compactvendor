@@ -1,3 +1,5 @@
+---@diagnostic disable: deprecated
+
 local strcmputf8i = strcmputf8i ---@type fun(str1: string|number, str2: string|number): result: number
 local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant
 local GetItemClassInfo = GetItemClassInfo or C_Item.GetItemClassInfo
