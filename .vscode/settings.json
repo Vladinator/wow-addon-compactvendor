@@ -20,6 +20,7 @@
     "Lua.diagnostics.globals": [
         "BagSearch_OnChar",
         "BagSearch_OnTextChanged",
+        "BROWSE_NO_RESULTS",
         "CanIMogIt",
         "CLOSE",
         "CloseDropDownMenus",

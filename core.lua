@@ -2268,8 +2268,11 @@ local MerchantScanner do
         end)
     end
 
+    ---@type FunctionContainer?
     local throttleHandleFullUpdate
-    local throttleHandlePartialUpdate
+
+    ---@type table<number, FunctionContainer?>
+    local throttleHandleItemUpdate = {}
 
     local function throttleHandleFullClear()
         if not throttleHandleFullUpdate then
@@ -2279,12 +2282,14 @@ local MerchantScanner do
         throttleHandleFullUpdate = nil
     end
 
-    local function throttleHandlePartialClear()
-        if not throttleHandlePartialUpdate then
+    ---@param itemID number
+    local function throttleHandleItemClear(itemID)
+        local handle = throttleHandleItemUpdate[itemID]
+        if not handle then
             return
         end
-        throttleHandlePartialUpdate:Cancel()
-        throttleHandlePartialUpdate = nil
+        handle:Cancel()
+        throttleHandleItemUpdate[itemID] = nil
     end
 
     local function TimerSafeUpdateMerchant()
@@ -2307,9 +2312,9 @@ local MerchantScanner do
     ---@param checkCostItems? boolean
     ---@param includePending? boolean
     function MerchantScanner:UpdateMerchantItemByIDThrottled(itemID, checkCostItems, includePending)
-        throttleHandlePartialClear()
-        throttleHandlePartialUpdate = C_Timer.NewTicker(self.ITEM_REFRESH_INTERVAL, function()
-            throttleHandlePartialClear()
+        throttleHandleItemClear(itemID)
+        throttleHandleItemUpdate[itemID] = C_Timer.NewTicker(self.ITEM_REFRESH_INTERVAL, function()
+            throttleHandleItemClear(itemID)
             self:UpdateMerchantItemByID(itemID, checkCostItems, includePending)
         end)
     end
@@ -2380,7 +2385,7 @@ local MerchantScanner do
             self:UpdateMerchantThrottled(true)
         elseif event == "MERCHANT_FILTER_ITEM_UPDATE" then
             local itemID = ...
-            self:UpdateMerchantItemByID(itemID)
+            self:UpdateMerchantItemByIDThrottled(itemID)
         elseif event == "HEIRLOOMS_UPDATED" then
             local itemID, updateReason = ...
             if itemID and updateReason == "NEW" then
@@ -2813,6 +2818,14 @@ local Frame do
         self.ScrollBox:SetPoint("TOPLEFT", 7, -64)
         self.ScrollBox:SetAllPoints() ---@diagnostic disable-line: missing-parameter
 
+        self.Loading = CreateFrame("Frame", nil, self, "SpinnerWithShadowTemplate")
+        self.Loading:SetSize(128, 128)
+        self.Loading:SetPoint("CENTER", self.ScrollBox, "CENTER", 0, 0)
+
+        self.NoItems = self.ScrollBox:CreateFontString(nil, "OVERLAY", "SystemFont_Shadow_Med3")
+        self.NoItems:SetAllPoints(self.ScrollBox)
+        self.NoItems:SetText(BROWSE_NO_RESULTS)
+
         ---@class EventFrame : Frame
         ---@field public Event table<"OnHide"|"OnShow"|"OnSizeChanged", number>
         ---@field public OnLoad_Intrinsic fun(self: EventFrame)
@@ -2852,6 +2865,20 @@ local Frame do
 
         local scrollPercentage
 
+        local function hasNoItems()
+            local merchantItems = MerchantDataProvider:GetMerchantItems()
+            if #merchantItems == 0 then
+                return true
+            end
+            local visibleItems = MerchantDataProvider:GetSize()
+            return visibleItems == 0
+        end
+
+        local function onShow()
+            self.Loading:Show()
+            self.NoItems:Hide()
+        end
+
         local function OnPreUpdate()
             if scrollPercentage then
                 return
@@ -2859,7 +2886,12 @@ local Frame do
             scrollPercentage = self.ScrollBox:CalculateScrollPercentage()
         end
 
-        local function OnPostUpdate()
+        ---@param isReady boolean
+        local function OnPostUpdate(_, isReady)
+            if isReady then
+                self.Loading:Hide()
+                self.NoItems:SetShown(hasNoItems())
+            end
             if not scrollPercentage then
                 return
             end
@@ -2867,6 +2899,7 @@ local Frame do
             scrollPercentage = nil
         end
 
+        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnShow, onShow)
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPreUpdate, OnPreUpdate)
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, OnPostUpdate)
 
