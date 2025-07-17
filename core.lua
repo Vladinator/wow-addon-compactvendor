@@ -2384,8 +2384,9 @@ local MerchantScanner do
         elseif event == "MERCHANT_UPDATE" then
             self:UpdateMerchantThrottled(true)
         elseif event == "MERCHANT_FILTER_ITEM_UPDATE" then
-            local itemID = ...
-            self:UpdateMerchantItemByIDThrottled(itemID)
+            -- local itemID = ...
+            -- self:UpdateMerchantItemByIDThrottled(itemID)
+            self:UpdateMerchantThrottled(true)
         elseif event == "HEIRLOOMS_UPDATED" then
             local itemID, updateReason = ...
             if itemID and updateReason == "NEW" then
