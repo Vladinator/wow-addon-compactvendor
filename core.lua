@@ -4168,6 +4168,9 @@ local CompactVendorFrameMerchantButtonTemplate do
                 end
             end
         elseif button == "RightButton" then
+            if not merchantItem.canAfford then
+                return
+            end
             if IsModifiedClick("ALT") then
                 self:Purchase(merchantItem.maxStackCount)
             else
