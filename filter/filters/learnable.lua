@@ -31,6 +31,13 @@ end
 
 do
 
+    ---@alias CompactVendorFilterDropDownLearnableOptionValue 1|2|3
+
+    ---@class CompactVendorFilterDropDownLearnableOption : CompactVendorFilterDropDownTemplateOption
+    ---@field public value CompactVendorFilterDropDownLearnableOptionValue
+
+    ---@type CompactVendorFilterDropDownLearnableOption[]
+
     ---@param itemData MerchantItem
     ---@return boolean collectable, boolean collected, number current, number total
     local function GetCollectedStatus(itemData)
@@ -65,10 +72,10 @@ do
     ---@param collected boolean
     ---@param current number
     ---@param total number
-    ---@return CompactVendorFilterDropDownTemplateOption option
+    ---@return CompactVendorFilterDropDownLearnableOption option
     local function GetCollectableOption(self, collected, current, total)
         local options = self.options
-        local value ---@type number
+        local value ---@type CompactVendorFilterDropDownLearnableOptionValue
         local text ---@type string
         if collected then
             if current == total then
@@ -82,9 +89,10 @@ do
             value = 3
             text = NO
         end
-        local option = self:GetOption(value)
+        ---@type CompactVendorFilterDropDownLearnableOption?
+        local option = self:GetOption(value) ---@diagnostic disable-line: assign-type-mismatch
         if not option then
-            option = {} ---@diagnostic disable-line: missing-fields
+            option = { value = nil, text = nil } ---@diagnostic disable-line: assign-type-mismatch
             options[#options + 1] = option
         end
         option.value = value
@@ -98,7 +106,7 @@ do
         function(self)
             local items = self.parent:GetMerchantItems()
             local options = self.options
-            local values = self.values
+            local values = self.values ---@type table<CompactVendorFilterDropDownLearnableOptionValue, boolean?>
             table.wipe(values)
             for _, option in ipairs(options) do
                 option.show = false
@@ -122,13 +130,13 @@ do
             end
             return GetCollectableOption(self, collected, current, total)
         end,
-        ---@param value? number
-        ---@param option? CompactVendorFilterDropDownTemplateOption
+        ---@param value? CompactVendorFilterDropDownLearnableOptionValue
+        ---@param option? CompactVendorFilterDropDownLearnableOption
         function(_, value, option, itemData)
             if not value or not option then
                 return
             end
-            local collectable, collected, current, total = GetCollectedStatus(itemData)
+            local collectable = GetCollectedStatus(itemData)
             if not collectable then
                 return
             end

@@ -503,7 +503,7 @@ local CompactVendorFilterDropDownTemplate do
 
     ---@class CompactVendorFilterDropDownTemplate : CompactVendorFilterTemplate
     ---@field public itemDataKey string
-    ---@field public values any[]
+    ---@field public values table<any, any>
     ---@field public options CompactVendorFilterDropDownTemplateOption[]
     ---@field public onRefresh CompactVendorFilterDropDownTemplateOnRefresh?
     ---@field public getValue CompactVendorFilterDropDownTemplateGetValue?

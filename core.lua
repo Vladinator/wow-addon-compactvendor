@@ -872,17 +872,18 @@ local IsTooltipTextPending do
 
     local ItemRequirementFieldCount = 2
 
+    ---@type { [1]: string, [2]: ItemRequirementType, [3]: string, [4]: string }[]
     local ItemRequirements = {
         { "Requires Renown Rank %d with the %s by a character on this account.", ItemRequirementType.Renown, "rank", "renown" }, -- TODO: localization
-        { ITEM_MIN_SKILL, ItemRequirementType.Profession, "requires", "amount" },
-        { ITEM_REQ_SKILL, ItemRequirementType.Profession, "requires" },
-        { ITEM_MIN_LEVEL, ItemRequirementType.Level, "level" },
         { ITEM_REQ_ARENA_RATING, ItemRequirementType.Rating, "rating" },
         { ITEM_REQ_PURCHASE_ACHIEVEMENT, ItemRequirementType.Achievement, "achievement" },
         { ITEM_REQ_PURCHASE_GUILD, ItemRequirementType.Guild, "guild" },
         { ITEM_REQ_PURCHASE_GUILD_LEVEL, ItemRequirementType.Guild, "guild", "level" },
         { ITEM_REQ_REPUTATION, ItemRequirementType.Reputation, "reputation", "rank" },
+        { ITEM_MIN_SKILL, ItemRequirementType.Profession, "requires", "amount" },
+        { ITEM_MIN_LEVEL, ItemRequirementType.Level, "level" },
         { ITEM_REQ_SPECIALIZATION, ItemRequirementType.Specialization, "specialization" },
+        { ITEM_REQ_SKILL, ItemRequirementType.Profession, "requires" },
     }
 
     for _, requirement in ipairs(ItemRequirements) do
