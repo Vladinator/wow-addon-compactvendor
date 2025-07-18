@@ -1872,6 +1872,10 @@ local RefreshAndUpdateMerchantItemButton do
         return self:IsAvailability(MerchantItemAvailabilityType.AvailableAndUsable)
     end
 
+    function MerchantItem:CanAfford()
+        return self.canAfford
+    end
+
     function MerchantItem:CanSpecifyQuantity()
         return self.canAfford
     end
@@ -1922,6 +1926,52 @@ local RefreshAndUpdateMerchantItemButton do
                 or itemSubClassID == Enum.ItemMiscellaneousSubclass.Other
         end
         return false
+    end
+
+    ---@param requirement ItemRequirement
+    ---@return boolean?
+    local function DefaultGetLearnRequirementsPredicate(requirement)
+        return requirement.isRed and requirement.type == 1 -- Profession
+    end
+
+    --- The default behavior is to return the requirements that are related to professions that are not satisfied (red text).
+    --- Otherwise, provide your own `predicate` to customize the filter logic.
+    ---@param predicate? fun(requirement: ItemRequirement): boolean?
+    ---@return ItemRequirement[]? requirements
+    function MerchantItem:GetLearnRequirements(predicate)
+        local requirements = self.canLearnRequirement
+        if not requirements then
+            return
+        end
+        predicate = predicate or DefaultGetLearnRequirementsPredicate
+        local results ---@type ItemRequirement[]?
+        local index = 0
+        for _, requirement in ipairs(requirements) do
+            if predicate(requirement) then
+                if not results then
+                    results = {}
+                end
+                index = index + 1
+                results[index] = requirement
+            end
+        end
+        return results
+    end
+
+    -- Get the first red profession (prioritize any with an `amount` value).
+    ---@return ItemRequirement? requirement
+    function MerchantItem:GetLearnRequirementsForRedProfessions()
+        local requirements = self:GetLearnRequirements()
+        if not requirements then
+            return
+        end
+        for i = #requirements, 1, -1 do
+            local requirement = requirements[i]
+            if requirement.amount then
+                return requirement
+            end
+        end
+        return requirements[1]
     end
 
     ---@param parent MerchantScanner
@@ -1980,15 +2030,9 @@ local RefreshAndUpdateMerchantItemButton do
             backgroundColor = BackgroundColorPreset.None
             textColor = ColorPreset.Gray
         elseif canLearnRequirement then
-            local redProfReq ---@type ItemRequirement?
-            for _, req in ipairs(canLearnRequirement) do
-                if req.isRed and req.type == 1 then -- Profession
-                    redProfReq = req
-                    break
-                end
-            end
-            if redProfReq then
-                if redProfReq.amount then
+            local requirement = merchantItem:GetLearnRequirementsForRedProfessions()
+            if requirement then
+                if requirement.amount then
                     backgroundColor = BackgroundColorPreset.Yellow
                 else
                     backgroundColor = BackgroundColorPreset.Orange
@@ -4136,7 +4180,7 @@ local CompactVendorFrameMerchantButtonTemplate do
         end
         if IsModifiedClick("DRESSUP") then
             ShowInspectCursor()
-        elseif not merchantItem.canAfford then
+        elseif not merchantItem:CanAfford() then
             SetCursor("BUY_ERROR_CURSOR")
         else
             SetCursor("BUY_CURSOR")
@@ -4168,7 +4212,7 @@ local CompactVendorFrameMerchantButtonTemplate do
                 end
             end
         elseif button == "RightButton" then
-            if not merchantItem.canAfford then
+            if not merchantItem:CanAfford() then
                 return
             end
             if IsModifiedClick("ALT") then
