@@ -21,9 +21,11 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         local values = self.values
         table.wipe(values)
         for _, itemData in ipairs(items) do
-            local value = itemData[itemDataKey] ---@type ItemRequirement?
+            local value = itemData[itemDataKey] ---@type ItemRequirement[]?
             if value then
-                values[value.type] = true
+                for _, req in pairs(value) do
+                    values[req.type] = true
+                end
             end
         end
     end
