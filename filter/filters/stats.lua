@@ -27,6 +27,21 @@ end
 ---@class CompactVendorFilterDropDownStatsOption : CompactVendorFilterDropDownTemplateOption
 ---@field public value CompactVendorFilterDropDownStatsOptionValue
 
+---@param options CompactVendorFilterDropDownStatsOption[]
+---@param itemValue StatTablePolyfill
+---@return StatTablePolyfill statTable
+local function FilterItemValue(options, itemValue)
+    local temp = {} ---@type StatTablePolyfill
+    for _, option in ipairs(options) do
+        if option.show and option.checked then
+            local key = option.value
+            local value = itemValue[key]
+            temp[key] = value
+        end
+    end
+    return temp
+end
+
 local filter = CompactVendorFilterDropDownTemplate:New(
     "Stats", {},
     "itemLink", {},
@@ -62,8 +77,12 @@ local filter = CompactVendorFilterDropDownTemplate:New(
             end
         end
     end,
-    function(_, itemLink)
-        return UpdateItemStatTable(itemLink)
+    function(self, itemLink)
+        local itemValue = UpdateItemStatTable(itemLink)
+        if not itemValue then
+            return
+        end
+        return FilterItemValue(self.options, itemValue)
     end,
     ---@param value? CompactVendorFilterDropDownStatsOptionValue
     ---@param itemValue? StatTablePolyfill?

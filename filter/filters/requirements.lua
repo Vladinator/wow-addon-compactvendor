@@ -1,6 +1,6 @@
 local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate ---@type CompactVendorFilterDropDownTemplate
 
----@alias CompactVendorFilterDropDownRequirementOptionValue false|ItemRequirement
+---@alias CompactVendorFilterDropDownRequirementOptionValue false|ItemRequirementInfo
 
 ---@class CompactVendorFilterDropDownRequirementOption : CompactVendorFilterDropDownTemplateOption
 ---@field public value CompactVendorFilterDropDownRequirementOptionValue
@@ -26,34 +26,35 @@ local Icon = {
     RedX = CreateAtlasMarkup("common-icon-redx", IconSize, IconSize),
 }
 
----@param requirement ItemRequirement
+---@param requirementInfo ItemRequirementInfo
 ---@param noIcon? boolean
-local function getRequirementText(requirement, noIcon)
+local function getRequirementInfoText(requirementInfo, noIcon)
+    local typeInfo = requirementInfo.type
     local text ---@type string?
-    if requirement.type == 1 then
-        text = format(requirement.amount and Format.ProfessionP or Format.Profession, requirement.requires, requirement.amount)
-    elseif requirement.type == 2 then
-        text = format(Format.Level, requirement.level)
-    elseif requirement.type == 3 then
-        text = format(Format.Rating, requirement.rating)
-    elseif requirement.type == 4 then
-        text = format(Format.Achievement, requirement.achievement)
-    elseif requirement.type == 5 then
-        text = format(requirement.level and Format.GuildP or Format.Guild, requirement.guild, requirement.level)
-    elseif requirement.type == 6 then
-        text = format(Format.ReputationP, requirement.reputation, requirement.rank)
-    elseif requirement.type == 7 then
-        text = format(Format.Specialization, requirement.specialization)
-    elseif requirement.type == 8 then
-        text = format(requirement.rank and Format.RenownP or Format.Renown, requirement.renown, requirement.rank)
+    if typeInfo == 1 then
+        text = format(requirementInfo.amount and Format.ProfessionP or Format.Profession, requirementInfo.requires, requirementInfo.amount)
+    elseif typeInfo == 2 then
+        text = format(Format.Level, requirementInfo.level)
+    elseif typeInfo == 3 then
+        text = format(Format.Rating, requirementInfo.rating)
+    elseif typeInfo == 4 then
+        text = format(Format.Achievement, requirementInfo.achievement)
+    elseif typeInfo == 5 then
+        text = format(requirementInfo.level and Format.GuildP or Format.Guild, requirementInfo.guild, requirementInfo.level)
+    elseif typeInfo == 6 then
+        text = format(Format.ReputationP, requirementInfo.reputation, requirementInfo.rank)
+    elseif typeInfo == 7 then
+        text = format(Format.Specialization, requirementInfo.specialization)
+    elseif typeInfo == 8 then
+        text = format(requirementInfo.rank and Format.RenownP or Format.Renown, requirementInfo.renown, requirementInfo.rank)
     end
     if not text then
-        text = requirement.raw
+        text = requirementInfo.raw
     end
     if noIcon then
         return text
     end
-    if requirement.isRed then
+    if requirementInfo.isRed then
         text = format("%s %s", Icon.RedX, text)
     else
         text = format("%s %s", Icon.Check, text)
@@ -61,17 +62,17 @@ local function getRequirementText(requirement, noIcon)
     return text
 end
 
----@type table<ItemRequirement, string?>
+---@type table<ItemRequirementInfo, string?>
 local textCache = {}
 
----@param requirement ItemRequirement
-local function getRequirementTextCached(requirement)
-    local text = textCache[requirement]
+---@param requirementInfo ItemRequirementInfo
+local function getRequirementInfoTextCached(requirementInfo)
+    local text = textCache[requirementInfo]
     if text then
         return text
     end
-    text = getRequirementText(requirement)
-    textCache[requirement] = text
+    text = getRequirementInfoText(requirementInfo)
+    textCache[requirementInfo] = text
     return text
 end
 
@@ -86,9 +87,46 @@ local noRequirementValueTable = {
     false,
 }
 
+---@param value CompactVendorFilterDropDownRequirementOptionValue
+local function getText(value)
+    if not value then
+        return noRequirementOption.text
+    end
+    return getRequirementInfoTextCached(value)
+end
+
+---@alias CompactVendorFilterDropDownRequirementOptionRelevantInfo { requirementInfo: CompactVendorFilterDropDownRequirementOptionValue, text: string }
+
+---@param options CompactVendorFilterDropDownRequirementOption[]
+---@param requirementsInfo? CompactVendorFilterDropDownRequirementOptionValue[]
+---@return CompactVendorFilterDropDownRequirementOptionRelevantInfo[] relevantInfo
+local function GetRelevantRequirements(options, requirementsInfo)
+    if not requirementsInfo then
+        requirementsInfo = noRequirementValueTable ---@type CompactVendorFilterDropDownRequirementOptionValue[]
+    end
+    local temp = {} ---@type CompactVendorFilterDropDownRequirementOptionRelevantInfo[]
+    local index = 0
+    for _, option in ipairs(options) do
+        if option.show and option.checked then
+            local value = getText(option.value)
+            for _, requirementInfo in ipairs(requirementsInfo) do
+                local text = getText(requirementInfo)
+                if value == text then
+                    index = index + 1
+                    temp[index] = {
+                        requirementInfo = requirementInfo,
+                        text = text,
+                    }
+                end
+            end
+        end
+    end
+    return temp
+end
+
 local filter = CompactVendorFilterDropDownTemplate:New(
     "Requirements", {},
-    "canLearnRequirement", {},
+    "hasRequirementsInfo", {},
     function(self)
         local items = self.parent:GetMerchantItems()
         local itemDataKey = self.itemDataKey
@@ -97,10 +135,10 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         table.wipe(values)
         table.wipe(textCache)
         for _, itemData in ipairs(items) do
-            local value = itemData[itemDataKey] ---@type ItemRequirement[]?
+            local value = itemData[itemDataKey] ---@type ItemRequirementInfo[]?
             if value then
-                for _, requirement in pairs(value) do
-                    values[requirement] = true
+                for _, requirementInfo in pairs(value) do
+                    values[requirementInfo] = true
                 end
             else
                 values[false] = true
@@ -110,12 +148,7 @@ local filter = CompactVendorFilterDropDownTemplate:New(
             option.show = false
         end
         for value, _ in pairs(values) do
-            local text ---@type string?
-            if value == false then
-                text = noRequirementOption.text
-            else
-                text = getRequirementTextCached(value)
-            end
+            local text = getText(value)
             ---@type CompactVendorFilterDropDownRequirementOption?
             local option = self:GetOption(text) ---@diagnostic disable-line: assign-type-mismatch
             if not option then
@@ -131,34 +164,22 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         end
     end,
     ---@param value? CompactVendorFilterDropDownRequirementOptionValue[]
-    function(_, value)
-        return value or false
+    function(self, value)
+        return GetRelevantRequirements(self.options, value)
     end,
-    ---@param value? CompactVendorFilterDropDownRequirementOptionValue
-    ---@param itemValue? CompactVendorFilterDropDownRequirementOptionValue[]
-    function(_, value, itemValue)
-        local valueText ---@type string?
-        if not value then
-            valueText = noRequirementOption.text
-        else
-            valueText = getRequirementTextCached(value)
-        end
-        if not itemValue then
-            itemValue = noRequirementValueTable
-        end
-        for _, requirement in pairs(itemValue) do
-            local text ---@type string?
-            if not requirement then
-                text = noRequirementOption.text
-            else
-                text = getRequirementTextCached(requirement)
-            end
+    ---@param value CompactVendorFilterDropDownRequirementOptionValue
+    ---@param relevantInfos CompactVendorFilterDropDownRequirementOptionRelevantInfo[]
+    function(_, value, relevantInfos, mi)
+        local valueText = getText(value)
+        for _, relevantInfo in pairs(relevantInfos) do
+            local text = relevantInfo.text
             if valueText == text then
-                return true
+                return false
             end
         end
-        return false
-    end
+        return true
+    end,
+    true
 )
 
 filter:Publish()
