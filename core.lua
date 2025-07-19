@@ -1780,7 +1780,7 @@ local RefreshAndUpdateMerchantItemButton do
         self.isToy = self.merchantItemID and C_ToyBox and C_ToyBox.GetToyInfo(self.merchantItemID) and true
         self.isToyCollected = self.merchantItemID and PlayerHasToy and PlayerHasToy(self.merchantItemID)
         self.isLearnable = self.isCosmetic or self.isCosmeticBundle or self:IsLearnable()
-        self.tooltipScannable = self.isLearnable
+        self.tooltipScannable = self.isLearnable or self:IsRequirementScannable()
         if self.isCosmeticBundle then
             self.isCollected = self.isCosmeticBundleCollected
             self.isCollectedNum = self.isCosmeticBundleNum
@@ -1796,9 +1796,6 @@ local RefreshAndUpdateMerchantItemButton do
         local function ProcessTooltipData()
             local tooltipData = self.tooltipData
             if not tooltipData or tooltipData == true then
-                return
-            end
-            if not self.isLearnable then
                 return
             end
             if self.canLearn == nil then
@@ -1927,6 +1924,10 @@ local RefreshAndUpdateMerchantItemButton do
                 or itemSubClassID == Enum.ItemMiscellaneousSubclass.Other
         end
         return false
+    end
+
+    function MerchantItem:IsRequirementScannable()
+        return true
     end
 
     ---@param requirement ItemRequirement
