@@ -49,7 +49,6 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         local items = self.parent:GetMerchantItems()
         local itemDataKey = self.itemDataKey
         local values = self.values ---@type table<CompactVendorFilterDropDownStatsOptionValue, boolean?>
-        local options = self.options ---@type CompactVendorFilterDropDownStatsOption[]
         table.wipe(values)
         for _, itemData in ipairs(items) do
             local itemLink = itemData[itemDataKey] ---@type string
@@ -59,22 +58,12 @@ local filter = CompactVendorFilterDropDownTemplate:New(
                 end
             end
         end
-        for _, option in ipairs(options) do
-            option.show = false
-        end
         for value, _ in pairs(values) do
-            ---@type CompactVendorFilterDropDownStatsOption?
-            local option = self:GetOption(value) ---@diagnostic disable-line: assign-type-mismatch
-            if not option then
-                option = { value = nil, text = nil } ---@diagnostic disable-line: assign-type-mismatch
-                options[#options + 1] = option
-            end
+            ---@type CompactVendorFilterDropDownStatsOption
+            local option = self:GetOption(value, true) ---@diagnostic disable-line: assign-type-mismatch
             option.value = value
             option.text = tostring(_G[value])
             option.show = true
-            if option.checked == nil then
-                option.checked = true
-            end
         end
     end,
     function(self, itemLink)

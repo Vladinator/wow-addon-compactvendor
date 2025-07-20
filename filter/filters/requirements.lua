@@ -1,6 +1,6 @@
 local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate ---@type CompactVendorFilterDropDownTemplate
 
----@alias CompactVendorFilterDropDownRequirementOptionValue false|ItemRequirementInfo
+---@alias CompactVendorFilterDropDownRequirementOptionValue false|string
 
 ---@class CompactVendorFilterDropDownRequirementOption : CompactVendorFilterDropDownTemplateOption
 ---@field public value CompactVendorFilterDropDownRequirementOptionValue
@@ -87,38 +87,37 @@ local noRequirementValueTable = {
     false,
 }
 
----@param value CompactVendorFilterDropDownRequirementOptionValue
+---@param value? false|string|ItemRequirementInfo
 local function getText(value)
     if not value then
         return noRequirementOption.text
     end
+    if type(value) == "string" then
+        return value
+    end
     return getRequirementInfoTextCached(value)
 end
 
----@alias CompactVendorFilterDropDownRequirementOptionRelevantInfo { requirementInfo: CompactVendorFilterDropDownRequirementOptionValue, text: string }
-
 ---@param options CompactVendorFilterDropDownRequirementOption[]
 ---@param requirementsInfo? CompactVendorFilterDropDownRequirementOptionValue[]
----@return CompactVendorFilterDropDownRequirementOptionRelevantInfo[] relevantInfo
-local function GetRelevantRequirements(options, requirementsInfo)
+---@return table<string, boolean?> itemValue
+local function FilterItemValue(options, requirementsInfo)
     if not requirementsInfo then
         requirementsInfo = noRequirementValueTable ---@type CompactVendorFilterDropDownRequirementOptionValue[]
     end
-    local temp = {} ---@type CompactVendorFilterDropDownRequirementOptionRelevantInfo[]
-    local index = 0
+    local temp = {} ---@type table<string, boolean?>
     for _, option in ipairs(options) do
-        if option.show and option.checked then
-            local value = getText(option.value)
+        if option.show and not option.checked then
+            local key = option.text
+            local found = false
             for _, requirementInfo in ipairs(requirementsInfo) do
                 local text = getText(requirementInfo)
-                if value == text then
-                    index = index + 1
-                    temp[index] = {
-                        requirementInfo = requirementInfo,
-                        text = text,
-                    }
+                if key == text then
+                    found = true
+                    break
                 end
             end
+            temp[key] = found
         end
     end
     return temp
@@ -131,53 +130,37 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         local items = self.parent:GetMerchantItems()
         local itemDataKey = self.itemDataKey
         local values = self.values ---@type table<CompactVendorFilterDropDownRequirementOptionValue, boolean?>
-        local options = self.options ---@type CompactVendorFilterDropDownRequirementOption[]
         table.wipe(values)
         table.wipe(textCache)
         for _, itemData in ipairs(items) do
             local value = itemData[itemDataKey] ---@type ItemRequirementInfo[]?
             if value then
                 for _, requirementInfo in pairs(value) do
-                    values[requirementInfo] = true
+                    local text = getText(requirementInfo)
+                    values[text] = true
                 end
             else
                 values[false] = true
             end
         end
-        for _, option in ipairs(options) do
-            option.show = false
-        end
         for value, _ in pairs(values) do
-            local text = getText(value)
-            ---@type CompactVendorFilterDropDownRequirementOption?
-            local option = self:GetOption(text) ---@diagnostic disable-line: assign-type-mismatch
-            if not option then
-                option = { value = nil, text = nil } ---@diagnostic disable-line: assign-type-mismatch
-                options[#options + 1] = option
-            end
+            ---@type CompactVendorFilterDropDownRequirementOption
+            local option = self:GetOption(value, true) ---@diagnostic disable-line: assign-type-mismatch
             option.value = value
-            option.text = text
+            option.text = getText(value)
             option.show = true
-            if option.checked == nil then
-                option.checked = true
-            end
         end
     end,
-    ---@param value? CompactVendorFilterDropDownRequirementOptionValue[]
-    function(self, value)
-        return GetRelevantRequirements(self.options, value)
+    ---@param requirementsInfo? CompactVendorFilterDropDownRequirementOptionValue[]
+    function(self, requirementsInfo)
+        return FilterItemValue(self.options, requirementsInfo)
     end,
     ---@param value CompactVendorFilterDropDownRequirementOptionValue
-    ---@param relevantInfos CompactVendorFilterDropDownRequirementOptionRelevantInfo[]
-    function(_, value, relevantInfos, mi)
+    ---@param itemValue table<string, boolean?>
+    function(_, value, itemValue)
         local valueText = getText(value)
-        for _, relevantInfo in pairs(relevantInfos) do
-            local text = relevantInfo.text
-            if valueText == text then
-                return false
-            end
-        end
-        return true
+        local reqValue = itemValue[valueText]
+        return reqValue or reqValue == nil
     end,
     true
 )

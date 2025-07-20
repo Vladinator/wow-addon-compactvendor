@@ -74,7 +74,6 @@ do
     ---@param total number
     ---@return CompactVendorFilterDropDownLearnableOption option
     local function GetCollectableOption(self, collected, current, total)
-        local options = self.options
         local value ---@type CompactVendorFilterDropDownLearnableOptionValue
         local text ---@type string
         if collected then
@@ -85,16 +84,15 @@ do
                 value = 2
                 text = PROFESSIONS_COLUMN_REAGENTS_PARTIAL
             end
+        elseif current < total then
+            value = 2
+            text = PROFESSIONS_COLUMN_REAGENTS_PARTIAL
         else
             value = 3
             text = NO
         end
-        ---@type CompactVendorFilterDropDownLearnableOption?
-        local option = self:GetOption(value) ---@diagnostic disable-line: assign-type-mismatch
-        if not option then
-            option = { value = nil, text = nil } ---@diagnostic disable-line: assign-type-mismatch
-            options[#options + 1] = option
-        end
+        ---@type CompactVendorFilterDropDownLearnableOption
+        local option = self:GetOption(value, true) ---@diagnostic disable-line: assign-type-mismatch
         option.value = value
         option.text = text
         return option
@@ -105,20 +103,13 @@ do
         "itemLink", {},
         function(self)
             local items = self.parent:GetMerchantItems()
-            local options = self.options
             local values = self.values ---@type table<CompactVendorFilterDropDownLearnableOptionValue, boolean?>
             table.wipe(values)
-            for _, option in ipairs(options) do
-                option.show = false
-            end
             for _, itemData in ipairs(items) do
                 local collectable, collected, current, total = GetCollectedStatus(itemData)
                 if collectable then
                     local option = GetCollectableOption(self, collected, current, total)
                     option.show = true
-                    if option.checked == nil then
-                        option.checked = true
-                    end
                     values[option.value] = true
                 end
             end

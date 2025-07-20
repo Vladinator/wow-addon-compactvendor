@@ -1688,6 +1688,7 @@ local RefreshAndUpdateMerchantItemButton do
     ---@field public isToy? boolean
     ---@field public isToyCollected? boolean
     ---@field public isLearnable? boolean
+    ---@field public tooltipRequirementsScannable? boolean
     ---@field public tooltipScannable? boolean
     ---@field public tooltipData TooltipItem|true|nil
     ---@field public hasRedRequirements? boolean
@@ -1895,7 +1896,8 @@ local RefreshAndUpdateMerchantItemButton do
         self.isToy = self.merchantItemID and C_ToyBox and C_ToyBox.GetToyInfo(self.merchantItemID) and true
         self.isToyCollected = self.merchantItemID and PlayerHasToy and PlayerHasToy(self.merchantItemID)
         self.isLearnable = self.isCosmetic or self.isCosmeticBundle or self:IsLearnable()
-        self.tooltipScannable = self.isLearnable or self:IsRequirementScannable()
+        self.tooltipRequirementsScannable = self:IsRequirementScannable()
+        self.tooltipScannable = self.isLearnable or self.tooltipRequirementsScannable
         if self.isCosmeticBundle then
             self.isCollected = self.isCosmeticBundleCollected
             self.isCollectedNum = self.isCosmeticBundleNum
@@ -1913,17 +1915,21 @@ local RefreshAndUpdateMerchantItemButton do
             if not tooltipData or tooltipData == true then
                 return
             end
-            if self.hasRedRequirements == nil then
-                self.hasRedRequirements,
-                self.hasRequirementsInfo = tooltipData:HasRequirements()
+            if self.tooltipRequirementsScannable then
+                if self.hasRedRequirements == nil then
+                    self.hasRedRequirements,
+                    self.hasRequirementsInfo = tooltipData:HasRequirements()
+                end
             end
-            if self.isLearned == nil then
-                self.isLearned = tooltipData:IsLearned()
-            end
-            if self.isCollected == nil then
-                self.isCollected,
-                self.isCollectedNum,
-                self.isCollectedNumMax = tooltipData:IsCollected()
+            if self.isLearnable then
+                if self.isLearned == nil then
+                    self.isLearned = tooltipData:IsLearned()
+                end
+                if self.isCollected == nil then
+                    self.isCollected,
+                    self.isCollectedNum,
+                    self.isCollectedNumMax = tooltipData:IsCollected()
+                end
             end
         end
         if self.tooltipData then
@@ -2042,7 +2048,7 @@ local RefreshAndUpdateMerchantItemButton do
     end
 
     function MerchantItem:IsRequirementScannable()
-        return true
+        return false -- TODO: the tooltip scanning and delay is a bit wonky, combined with filter toggling and full reloading more work needs to be done so the UX is better (for now turning this back off again)
     end
 
     ---@param predicate? fun(requirementInfo: ItemRequirementInfo): boolean?
@@ -2401,13 +2407,16 @@ local MerchantScanner do
     ---@param predicate? fun(itemData: MerchantItem): boolean?
     function MerchantScanner:UpdateMerchant(isFullUpdate, predicate)
         local merchantExists = self:UpdateMerchantInfo()
-        if not merchantExists then
+        if isFullUpdate == true or not merchantExists then
             self.itemPool:ReleaseAll()
-            self:UpdateCollection(true)
-            return
-        end
-        if isFullUpdate == true then
-            self.itemPool:ReleaseAll()
+            self.isReady = false
+            if not merchantExists then
+                self:UpdateCollection(true)
+                self:TriggerEvent(self.Event.OnHide)
+                return
+            else
+                self:TriggerEvent(self.Event.OnShow)
+            end
         end
         local numMerchantItems = GetMerchantNumItems()
         local activeItems = GetActiveItems(numMerchantItems)
@@ -3059,9 +3068,19 @@ local Frame do
             return visibleItems == 0
         end
 
-        local function onShow()
-            self.Loading:Show()
-            self.NoItems:Hide()
+        ---@param isReady? boolean
+        local function updateLoading(isReady)
+            if not isReady then
+                self.Loading:Show()
+                self.NoItems:Hide()
+                return
+            end
+            self.Loading:Hide()
+            self.NoItems:SetShown(hasNoItems())
+        end
+
+        local function OnShow()
+            updateLoading()
         end
 
         local function OnPreUpdate()
@@ -3073,10 +3092,7 @@ local Frame do
 
         ---@param isReady boolean
         local function OnPostUpdate(_, isReady)
-            if isReady then
-                self.Loading:Hide()
-                self.NoItems:SetShown(hasNoItems())
-            end
+            updateLoading(isReady)
             if not scrollPercentage then
                 return
             end
@@ -3084,7 +3100,7 @@ local Frame do
             scrollPercentage = nil
         end
 
-        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnShow, onShow)
+        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnShow, OnShow)
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPreUpdate, OnPreUpdate)
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, OnPostUpdate)
 
@@ -3235,13 +3251,6 @@ local Frame do
 
         frame:OnLoad()
         frame:SetScript("OnEvent", frame.OnEvent)
-
-        local function refreshFilters()
-            frame:Refresh()
-        end
-
-        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnShow, refreshFilters)
-        MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, refreshFilters)
 
     end
 

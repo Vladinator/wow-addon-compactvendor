@@ -28,6 +28,7 @@ local UIDropDownMenu_AddButton = UIDropDownMenu_AddButton ---@type fun(info: Dro
 local CompactVendorFilterButtonTemplate do
 
     ---@class CompactVendorFilterButtonTemplate : Button
+    ---@field public Menu CompactVendorFilterFrameTemplate
     ---@field public Icon Texture
     ---@field public All Texture
 
@@ -103,7 +104,29 @@ local CompactVendorFilterFrameTemplate do
         self.VendorOpen = false
         self.VendorUpdating = false
         UIDropDownMenu_SetInitializeFunction(self, self.DropdownInitialize)
-        self.MerchantDataProvider:RegisterCallback(self.MerchantDataProvider.Event.OnReady, function() self:Refresh() end)
+        local function onLoading()
+            self.Button:Hide()
+            CloseDropDownMenus()
+        end
+        local function canUseFilters()
+            self.Button:Show()
+            self:RefreshFilters()
+        end
+        local function onReady()
+            canUseFilters()
+            self:Refresh(true)
+        end
+        ---@param isReady boolean
+        local function onUpdate(_, isReady)
+            if isReady then
+                canUseFilters()
+            else
+                onLoading()
+            end
+        end
+        self.MerchantDataProvider:RegisterCallback(self.MerchantDataProvider.Event.OnShow, onLoading)
+        self.MerchantDataProvider:RegisterCallback(self.MerchantDataProvider.Event.OnPostUpdate, onUpdate)
+        self.MerchantDataProvider:RegisterCallback(self.MerchantDataProvider.Event.OnReady, onReady)
     end
 
     ---@param event WowEvent
@@ -121,7 +144,6 @@ local CompactVendorFilterFrameTemplate do
     function CompactVendorFilterFrameTemplate:MerchantOpen()
         self.VendorOpen = true
         self:Refresh()
-        C_Timer.After(0.5, function() self:Refresh() end) -- HOTFIX: force update the dropdown choices once data is fully loaded
     end
 
     function CompactVendorFilterFrameTemplate:MerchantClose()
@@ -152,23 +174,27 @@ local CompactVendorFilterFrameTemplate do
         return true
     end
 
-    function CompactVendorFilterFrameTemplate:RefreshDropdown()
-        ToggleDropDownMenu(1, nil, self, self.Button, 0, 0)
-        ToggleDropDownMenu(1, nil, self, self.Button, 0, 0)
-        self:Refresh()
-    end
-
-    function CompactVendorFilterFrameTemplate:Refresh()
-        if self.VendorUpdating then
-            return
-        end
-        self.VendorUpdating = true
+    function CompactVendorFilterFrameTemplate:RefreshFilters()
         for _, filter in pairs(self.Filters) do
             filter:OnRefresh()
             if not filter:IsRelevant() then
                 filter:ShowAll()
             end
         end
+    end
+
+    function CompactVendorFilterFrameTemplate:RefreshDropdown()
+        ToggleDropDownMenu(1, nil, self, self.Button, 0, 0)
+        ToggleDropDownMenu(1, nil, self, self.Button, 0, 0)
+        self:Refresh()
+    end
+
+    ---@param forceUpdate? boolean
+    function CompactVendorFilterFrameTemplate:Refresh(forceUpdate)
+        if self.VendorUpdating and not forceUpdate then
+            return
+        end
+        self.VendorUpdating = true
         self.MerchantDataProvider:Refresh()
         self.VendorUpdating = false
     end
@@ -408,18 +434,18 @@ local CompactVendorFilterToggleTemplate do
     ---@param itemData MerchantItem
     ---@return boolean? isFiltered
     function CompactVendorFilterToggleTemplate:IsFiltered(itemData)
-        local value = itemData[self.itemDataKey]
+        local value = itemData[self.itemDataKey] ---@type any?
         if value == nil then
             return
         end
-        local option = self:isChecked()
-        if option == nil then
+        local checked = self:isChecked()
+        if checked == nil then
             return
         end
         if not self:IsRelevant() then
             return
         end
-        local filtered = (option and value) or (not option and not value)
+        local filtered = (checked and value) or (not checked and not value)
         return filtered
     end
 
@@ -516,6 +542,9 @@ local CompactVendorFilterDropDownTemplate do
 
     function CompactVendorFilterDropDownTemplate:OnRefresh()
         CompactVendorFilterTemplate.OnRefresh(self)
+        for _, option in ipairs(self.options) do
+            option.show = false
+        end
         if self.onRefresh then
             self:onRefresh()
         end
@@ -549,18 +578,31 @@ local CompactVendorFilterDropDownTemplate do
     ---@param itemData MerchantItem
     ---@return boolean? isFiltered
     function CompactVendorFilterDropDownTemplate:IsFiltered(itemData)
-        local value = itemData[self.itemDataKey]
+        local value = itemData[self.itemDataKey] ---@type any?
         if self.getValue then
             value = self:getValue(value, itemData)
         end
         local hasValue = self.hasValue
+        local isAccumulative = self.isAccumulative
         local numFiltered = 0
         local numUnfiltered = 0
         for _, option in ipairs(self.options) do
-            local isUnchecked = not option.checked
-            if hasValue then
-                if hasValue(self, option.value, value, itemData) == true then
-                    if self.isAccumulative then
+            if option.show then
+                local isUnchecked = not option.checked
+                if hasValue then
+                    if hasValue(self, option.value, value, itemData) == true then
+                        if isAccumulative then
+                            if isUnchecked then
+                                numFiltered = numFiltered + 1
+                            else
+                                numUnfiltered = numUnfiltered + 1
+                            end
+                        else
+                            return isUnchecked
+                        end
+                    end
+                elseif option.value == value then
+                    if isAccumulative then
                         if isUnchecked then
                             numFiltered = numFiltered + 1
                         else
@@ -570,19 +612,9 @@ local CompactVendorFilterDropDownTemplate do
                         return isUnchecked
                     end
                 end
-            elseif option.value == value then
-                if self.isAccumulative then
-                    if isUnchecked then
-                        numFiltered = numFiltered + 1
-                    else
-                        numUnfiltered = numUnfiltered + 1
-                    end
-                else
-                    return isUnchecked
-                end
             end
         end
-        if self.isAccumulative then
+        if isAccumulative then
             return numFiltered ~= 0 and numUnfiltered ~= 0
         end
         return false
@@ -642,13 +674,29 @@ local CompactVendorFilterDropDownTemplate do
     end
 
     ---@param valueOrText any
-    ---@return CompactVendorFilterDropDownTemplateOption? option, number? index
-    function CompactVendorFilterDropDownTemplate:GetOption(valueOrText)
-        for index, option in ipairs(self.options) do
+    ---@param autoCreate? boolean|fun(option: CompactVendorFilterDropDownTemplateOption, index: number): boolean?
+    ---@return CompactVendorFilterDropDownTemplateOption option, number? index
+    function CompactVendorFilterDropDownTemplate:GetOption(valueOrText, autoCreate)
+        local options = self.options
+        for index, option in ipairs(options) do
             if option.value == valueOrText or option.text == valueOrText then
                 return option, index
             end
         end
+        if not autoCreate then
+            return nil, nil ---@diagnostic disable-line: return-type-mismatch
+        end
+        ---@type CompactVendorFilterDropDownTemplateOption
+        local option = { value = nil, text = nil, checked = true } ---@diagnostic disable-line: assign-type-mismatch
+        local index = #options + 1
+        if type(autoCreate) == "function" then
+            local result = autoCreate(option, index)
+            if result == false then
+                return nil, nil ---@diagnostic disable-line: return-type-mismatch
+            end
+        end
+        options[index] = option
+        return option, index
     end
 
     function CompactVendorFilterDropDownTemplate:SortOptions()
@@ -720,11 +768,7 @@ local CompactVendorFilterDropDownWrapperTemplate do
             option.show = false
         end
         for value, _ in pairs(values) do
-            local option = self:GetOption(value)
-            if not option then
-                option = {} ---@diagnostic disable-line: missing-fields
-                options[#options + 1] = option
-            end
+            local option = self:GetOption(value, true)
             option.value = value
             if self.valueIsLocaleKey then
                 option.text = tostring(_G[value])
@@ -732,9 +776,6 @@ local CompactVendorFilterDropDownWrapperTemplate do
                 option.text = tostring(value)
             end
             option.show = true
-            if option.checked == nil then
-                option.checked = true
-            end
         end
     end
 
@@ -788,11 +829,7 @@ local CompactVendorFilterDropDownToggleWrapperTemplate do
             option.show = false
         end
         for value, _ in pairs(values) do
-            local option = self:GetOption(value)
-            if not option then
-                option = {} ---@diagnostic disable-line: missing-fields
-                options[#options + 1] = option
-            end
+            local option = self:GetOption(value, true)
             option.value = value
             if self.getValueText then
                 option.text = self:getValueText(value)
@@ -803,9 +840,6 @@ local CompactVendorFilterDropDownToggleWrapperTemplate do
                 option.index = option.text == YES and 1 or 2
             end
             option.show = true
-            if option.checked == nil then
-                option.checked = true
-            end
         end
     end
 
