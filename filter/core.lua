@@ -105,12 +105,13 @@ local CompactVendorFilterFrameTemplate do
         self.VendorUpdating = false
         UIDropDownMenu_SetInitializeFunction(self, self.DropdownInitialize)
         local function onLoading()
+            self:RefreshFilters(true)
             self.Button:Hide()
             CloseDropDownMenus()
         end
         local function canUseFilters()
-            self.Button:Show()
             self:RefreshFilters()
+            self.Button:Show()
         end
         local function onReady()
             canUseFilters()
@@ -174,8 +175,12 @@ local CompactVendorFilterFrameTemplate do
         return true
     end
 
-    function CompactVendorFilterFrameTemplate:RefreshFilters()
+    ---@param reset? boolean
+    function CompactVendorFilterFrameTemplate:RefreshFilters(reset)
         for _, filter in pairs(self.Filters) do
+            if reset then
+                filter:ResetFilter()
+            end
             filter:OnRefresh()
             if not filter:IsRelevant() then
                 filter:ShowAll()

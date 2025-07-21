@@ -986,7 +986,7 @@ local IsTooltipTextPending do
             local infoType = requirementInfo.type
             if infoType == ItemRequirementType.Level then
                 local reqLevel = tonumber(requirementInfo.level) or 0
-                if playerLevel > reqLevel then
+                if playerLevel >= reqLevel then
                     add = false
                 end
             end
@@ -1399,6 +1399,316 @@ local TooltipScanner do
 
 end
 
+-- [[
+if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+
+	---@class TooltipScanEventFrame : Frame
+	local eventFrame = CreateFrame("Frame")
+	eventFrame.scanObjects = {} ---@type table<TooltipScanObjectMixin, true?>
+	eventFrame:RegisterEvent("TOOLTIP_DATA_UPDATE")
+	eventFrame:SetScript("OnEvent", function(_, ...)
+		for tooltip, _ in pairs(eventFrame.scanObjects) do
+			tooltip:OnEvent(...)
+		end
+	end)
+
+	---@class TooltipDataHandlerTooltipInfo
+	---@field public tooltipData? TooltipData If provided, the getters are ignored, otherwise provide the getter fields if tooltipData is missing.
+	---@field public getterName? string The method name like `GetHyperlink` which then gets used like `C_TooltipInfo.GetHyperlink()`.
+	---@field public getterArgs? table The method arguments which gets unpacked when the getter method is called.
+	---@field public append? boolean If true, the tooltip will not be cleared and the backdrop style (Azerite and Corrupted) will not be set.
+	---@field public excludeLines? Enum.TooltipDataLineType[] Table of line types to exclude from the tooltip.
+	---@field public tooltipPostCall? fun(self: TooltipScanObjectMixin) Callback for the tooltip after it has processed the info.
+	---@field public rebuildPreCall? fun(self: TooltipScanObjectMixin): boolean? Callback before the tooltip is rebuilt from a TOOLTIP_DATA_UPDATE. Only checked for primary info in the case of multiple.
+	---@field public rebuildPostCall? fun(self: TooltipScanObjectMixin) Callback after the tooltip is rebuilt from a TOOLTIP_DATA_UPDATE. Only checked for primary info in the case of multiple.
+
+	---@class TooltipScanObjectMixin
+	---@field public infoList? TooltipDataHandlerTooltipInfo[]
+	---@field public processingInfo? TooltipDataHandlerTooltipInfo
+
+	---@class TooltipScanObjectMixin
+	local TooltipScanObjectMixin = {}
+
+	function TooltipScanObjectMixin:OnLoad()
+		eventFrame.scanObjects[self] = true
+	end
+
+	---@param event WowEvent
+	function TooltipScanObjectMixin:OnEvent(event, ...)
+		if event == "TOOLTIP_DATA_UPDATE" then
+			local dataInstanceID = ... ---@type number?
+			if not dataInstanceID or self:HasDataInstanceID(dataInstanceID) then
+				self:RebuildFromTooltipInfo()
+			end
+		end
+	end
+
+	function TooltipScanObjectMixin:IsTooltipDataLoaded()
+		local tooltipData = self:GetTooltipData()
+		if not tooltipData then
+			return false
+		end
+		local lines = tooltipData.lines
+		if #lines == 0 then
+			return false
+		end
+		for _, line in ipairs(lines) do
+			if line.leftText == RETRIEVING_ITEM_INFO then
+				return false
+			end
+		end
+		return true
+	end
+
+	---@param callback fun(tooltipData: TooltipData, tooltip: TooltipScanObjectMixin)
+	---@param hyperlink string
+	---@param optionalArg1? number
+	---@param optionalArg2? number
+	---@param hideVendorPrice? boolean
+	---@return boolean accepted
+	function TooltipScanObjectMixin:ScanHyperlink(callback, hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+		local done = false
+		local function postCallback()
+			if done then
+				return
+			end
+			if not self:IsTooltipDataLoaded() then
+				return
+			end
+			done = true
+			local tooltipData = self:GetTooltipData()
+			callback(tooltipData, self) ---@diagnostic disable-line: param-type-mismatch
+		end
+		---@type TooltipDataHandlerTooltipInfo
+		local processInfo = {
+			getterName = "GetHyperlink",
+			getterArgs = { hyperlink, optionalArg1, optionalArg2, hideVendorPrice },
+			tooltipPostCall = postCallback,
+			rebuildPostCall = postCallback,
+		}
+		return self:ProcessInfo(processInfo)
+	end
+
+	---@return TooltipDataHandlerTooltipInfo? tooltipInfo
+	function TooltipScanObjectMixin:GetTooltipInfo()
+		return self.infoList and self.infoList[1]
+	end
+
+	---@return TooltipData? tooltipData
+	function TooltipScanObjectMixin:GetTooltipData()
+		local tooltipInfo = self:GetTooltipInfo()
+		return tooltipInfo and tooltipInfo.tooltipData
+	end
+
+	function TooltipScanObjectMixin:ResetTooltip()
+		self.infoList = nil
+		self.processingInfo = nil
+	end
+
+	---@param info TooltipDataHandlerTooltipInfo
+	function TooltipScanObjectMixin:ProcessInfo(info)
+		if not info then
+			return false
+		end
+		if not info.tooltipData then
+			if not info.getterName then
+				return false
+			end
+			if info.getterArgs then
+				info.tooltipData = C_TooltipInfo[info.getterName](unpack(info.getterArgs))
+			else
+				info.tooltipData = C_TooltipInfo[info.getterName]()
+			end
+		end
+		local tooltipData = info.tooltipData
+		if not tooltipData then
+			return false
+		end
+		if not info.append then
+			self.infoList = {}
+		elseif not self.infoList then
+			self.infoList = {}
+		end
+		self.infoList[#self.infoList + 1] = info
+		self.processingInfo = info
+		if self.processingInfo.tooltipPostCall then
+			self.processingInfo.tooltipPostCall(self)
+		end
+		return true
+	end
+
+	function TooltipScanObjectMixin:RebuildFromTooltipInfo()
+		local oldTooltipInfo = self:GetTooltipInfo()
+		if not oldTooltipInfo then
+			return
+		end
+		local infoList = self.infoList
+		self.infoList = {}
+		if oldTooltipInfo.rebuildPreCall then
+			local skipRebuild = oldTooltipInfo.rebuildPreCall(self)
+			if skipRebuild then
+				return
+			end
+		end
+        if infoList then
+            for index, tooltipInfo in ipairs(infoList) do
+                if tooltipInfo.getterName then
+                    tooltipInfo.tooltipData = nil
+                end
+                if index == 1 then
+                    tooltipInfo.append = false
+                end
+                self:ProcessInfo(tooltipInfo)
+            end
+        end
+		if oldTooltipInfo.rebuildPostCall then
+			oldTooltipInfo.rebuildPostCall(self)
+		end
+	end
+
+	---@param dataInstanceID number
+	function TooltipScanObjectMixin:HasDataInstanceID(dataInstanceID)
+		if not self.infoList then
+			return false
+		end
+		for _, tooltipInfo in ipairs(self.infoList) do
+			if tooltipInfo.tooltipData and tooltipInfo.tooltipData.dataInstanceID == dataInstanceID then
+				return true
+			end
+		end
+		return false
+	end
+
+	---@class TooltipScanPoolMixin
+	---@field public Acquire fun(self): TooltipScanObjectMixin
+	---@field public Release fun(self, tooltip: TooltipScanObjectMixin)
+	---@field public ReleaseAll fun(self)
+	---@field public EnumerateActive fun(self): fun(): TooltipScanObjectMixin
+	---@field public EnumerateInactive fun(self): fun(): TooltipScanObjectMixin
+	---@field public GetNextActive fun(self, tooltip: TooltipScanObjectMixin): TooltipScanObjectMixin?
+	---@field public GetNextInactive fun(self, current: TooltipScanObjectMixin): TooltipScanObjectMixin?
+	---@field public IsActive fun(self, tooltip: TooltipScanObjectMixin): boolean
+	---@field public GetNumActive fun(self): number
+	---@field public SetResetDisallowedIfNew fun(self, state: boolean)
+
+	---@type fun(creationFunc: (fun(pool: TooltipScanPoolMixin): TooltipScanObjectMixin), resetterFunc?: fun(pool: TooltipScanPoolMixin, object: TooltipScanObjectMixin)): TooltipScanPoolMixin
+	local CreateTooltipPool = CreateObjectPool
+
+	---@class TooltipScanPool : TooltipScanPoolMixin
+	local TooltipScanPool = CreateTooltipPool(
+		function()
+			local tooltip = Mixin({}, TooltipScanObjectMixin)
+			tooltip:OnLoad()
+			return tooltip
+		end,
+		function(_, tooltip)
+			tooltip:ResetTooltip()
+		end
+	)
+
+	---@param hyperlink string
+	function TooltipScanPool:CanScanHyperlink(hyperlink)
+		if type(hyperlink) ~= "string" then
+			return false
+		end
+		if not hyperlink:find("|H[^:0-9]+:%d+") then
+			return false
+		end
+		return true
+	end
+
+	---@param callback fun(tooltipData: TooltipData)
+	---@param hyperlink string
+	---@param optionalArg1? number
+	---@param optionalArg2? number
+	---@param hideVendorPrice? boolean
+	---@return boolean accepted
+	function TooltipScanPool:ScanHyperlink(callback, hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+		if not self:CanScanHyperlink(hyperlink) then
+			return false
+		end
+		local tooltip = self:Acquire()
+		return tooltip:ScanHyperlink(
+			function(tooltipData)
+				self:Release(tooltip)
+				callback(tooltipData)
+			end,
+			hyperlink, optionalArg1, optionalArg2, hideVendorPrice
+		)
+	end
+
+	---@param callback fun(tooltipDatas: TooltipData[])
+	---@param hyperlinks string[]
+	---@param optionalArg1? number
+	---@param optionalArg2? number
+	---@param hideVendorPrice? boolean
+	---@return boolean accepted
+	function TooltipScanPool:ScanHyperlinks(callback, hyperlinks, optionalArg1, optionalArg2, hideVendorPrice)
+		local tooltipDatas = {} ---@type TooltipData[]
+		local pending = #hyperlinks
+		local accepted = false
+		for index, hyperlink in ipairs(hyperlinks) do
+			local scanAccepted = self:ScanHyperlink(
+				function(tooltipData)
+					tooltipDatas[index] = tooltipData
+					pending = pending - 1
+					if pending == 0 then
+						callback(tooltipDatas)
+					end
+				end,
+				hyperlink, optionalArg1, optionalArg2, hideVendorPrice
+			)
+			if scanAccepted then
+				accepted = true
+			else
+				tooltipDatas[index] = nil
+				pending = pending - 1
+			end
+		end
+		return accepted
+	end
+
+    ---@param hyperlinkOrItemID string|number
+    ---@param optionalArg1? number
+    ---@param optionalArg2? number
+    ---@param hideVendorPrice? boolean
+    ---@return TooltipItem|boolean tooltipData, boolean isPending
+    function TooltipScanner:ScanHyperlink(hyperlinkOrItemID, optionalArg1, optionalArg2, hideVendorPrice)
+        local hyperlink = self:SanitizeHyperlink(hyperlinkOrItemID)
+        if not hyperlink then
+            return false, false
+        end
+        local itemID = GetItemInfoInstant(hyperlink)
+        if not itemID then
+            return false, false
+        end
+        local tooltipData ---@type TooltipData?
+        local accepted = TooltipScanPool:ScanHyperlink(
+            function(data)
+                tooltipData = data
+            end,
+            hyperlink, optionalArg1, optionalArg2, hideVendorPrice
+        )
+        if not accepted then
+            return false, false
+        end
+        if not tooltipData then
+            return true, true
+        end
+        local itemData = self:ConvertToTooltipItem(tooltipData, hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+        local isPending = itemData:IsPending()
+        if isPending then
+            self:AddPending(itemData)
+            self:UpdatePending()
+            return itemData, itemData:IsPending()
+        end
+        self:TriggerEvent(self.Event.OnItemReady, itemData)
+        return itemData, isPending
+    end
+
+end
+--]]
+
 ---@class TooltipDataProvider
 local TooltipDataProvider do
 
@@ -1508,7 +1818,7 @@ local TooltipDataProvider do
     ---@param query TooltipDataProviderCallbackKey
     ---@param callback? TooltipDataProviderCallback
     ---@param skipCallbackWhenInstant? boolean
-    ---@return TooltipItem|boolean|nil itemData
+    ---@return TooltipItem|true|nil itemData
     function TooltipDataProvider:ScanHyperlink(query, callback, skipCallbackWhenInstant)
         if type(callback) ~= "function" then
             callback = nil
@@ -1533,46 +1843,46 @@ local TooltipDataProvider do
         self:SetPending(hyperlink)
         local tooltipData, tooltipIsPending = TooltipScanner:ScanHyperlink(hyperlink)
         if tooltipIsPending then
-            return tooltipData
+            return tooltipData or true
         end
         if tooltipData == false then
             self:ClearPending(hyperlink)
         end
     end
 
-    ---@param index number
-    ---@param callback? TooltipDataProviderCallback
-    ---@param skipCallbackWhenInstant? boolean
-    ---@return TooltipItem|boolean|nil itemData
-    function TooltipDataProvider:ScanMerchantItem(index, callback, skipCallbackWhenInstant)
-        if type(callback) ~= "function" then
-            callback = nil
-        end
-        local isPending = self:IsPending(index)
-        -- if not isPending then
-        --     local itemData = self:GetHyperlinkOrIndex(index)
-        --     if itemData then
-        --         if callback and not skipCallbackWhenInstant then
-        --             callback(itemData)
-        --         end
-        --         return itemData
-        --     end
-        -- end
-        if callback then
-            self:RegisterCallback(index, callback)
-        end
-        if isPending then
-            return true
-        end
-        self:SetPending(index)
-        local tooltipData, tooltipIsPending = TooltipScanner:ScanMerchantItem(index)
-        if tooltipIsPending then
-            return tooltipData
-        end
-        if tooltipData == false then
-            self:ClearPending(index)
-        end
-    end
+    -- ---@param index number
+    -- ---@param callback? TooltipDataProviderCallback
+    -- ---@param skipCallbackWhenInstant? boolean
+    -- ---@return TooltipItem|boolean|nil itemData
+    -- function TooltipDataProvider:ScanMerchantItem(index, callback, skipCallbackWhenInstant)
+    --     if type(callback) ~= "function" then
+    --         callback = nil
+    --     end
+    --     local isPending = self:IsPending(index)
+    --     -- if not isPending then
+    --     --     local itemData = self:GetHyperlinkOrIndex(index)
+    --     --     if itemData then
+    --     --         if callback and not skipCallbackWhenInstant then
+    --     --             callback(itemData)
+    --     --         end
+    --     --         return itemData
+    --     --     end
+    --     -- end
+    --     if callback then
+    --         self:RegisterCallback(index, callback)
+    --     end
+    --     if isPending then
+    --         return true
+    --     end
+    --     self:SetPending(index)
+    --     local tooltipData, tooltipIsPending = TooltipScanner:ScanMerchantItem(index)
+    --     if tooltipIsPending then
+    --         return tooltipData
+    --     end
+    --     if tooltipData == false then
+    --         self:ClearPending(index)
+    --     end
+    -- end
 
     ---@param itemData TooltipItem
     local function OnItemReady(_, itemData)
@@ -2048,7 +2358,7 @@ local RefreshAndUpdateMerchantItemButton do
     end
 
     function MerchantItem:IsRequirementScannable()
-        return false -- TODO: the tooltip scanning and delay is a bit wonky, combined with filter toggling and full reloading more work needs to be done so the UX is better (for now turning this back off again)
+        return true -- TODO: the tooltip scanning and delay is a bit wonky, combined with filter toggling and full reloading more work needs to be done so the UX is better (for now turning this back off again)
     end
 
     ---@param predicate? fun(requirementInfo: ItemRequirementInfo): boolean?
