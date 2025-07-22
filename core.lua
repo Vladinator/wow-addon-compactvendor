@@ -1472,6 +1472,7 @@ end
 
 local CreateMerchantItem
 local CreateMerchantItemButton
+local ResetMerchantItemButton
 local UpdateMerchantItemButton
 local RefreshAndUpdateMerchantItemButton do
 
@@ -1514,6 +1515,7 @@ local RefreshAndUpdateMerchantItemButton do
 
     ---@class MerchantItem
     ---@field public parent MerchantScanner
+    ---@field public parentButton? CompactVendorFrameMerchantButtonTemplate
     ---@field public index number
     ---@field public name? string
     ---@field public texture number|string
@@ -1805,10 +1807,14 @@ local RefreshAndUpdateMerchantItemButton do
             ProcessTooltipData()
             return
         end
+        local merchantItemID = self.merchantItemID
         local updateMerchantItem = false
         local hyperlink = TooltipScanner:GetSanitizedHyperlinkForItemQuery(self.itemLink)
         local accepted = TooltipScanner:ScanHyperlinkCached(
             function(data)
+                if merchantItemID ~= self.merchantItemID then
+                    return
+                end
                 self.tooltipData = CreateTooltipItem(data, self.itemLink)
                 ProcessTooltipData()
                 if not updateMerchantItem then
@@ -1993,9 +1999,8 @@ local RefreshAndUpdateMerchantItemButton do
     end
 
     ---@param button CompactVendorFrameMerchantButtonTemplate
-    ---@param merchantItem? MerchantItem
-    function UpdateMerchantItemButton(button, merchantItem)
-        button.merchantItem = merchantItem
+    function UpdateMerchantItemButton(button)
+        local merchantItem = button.merchantItem
         local index = merchantItem and merchantItem:GetIndex()
         if not merchantItem or not index then
             button:SetID(0)
@@ -2045,22 +2050,31 @@ local RefreshAndUpdateMerchantItemButton do
     end
 
     ---@param button CompactVendorFrameMerchantButtonTemplate
-    ---@param merchantItem? MerchantItem
-    function RefreshAndUpdateMerchantItemButton(button, merchantItem)
-        if not merchantItem then
-            merchantItem = button.merchantItem
-        end
+    function RefreshAndUpdateMerchantItemButton(button)
+        local merchantItem = button.merchantItem
         if merchantItem then
             merchantItem:Refresh()
         end
-        UpdateMerchantItemButton(button, merchantItem)
+        UpdateMerchantItemButton(button)
+    end
+
+    ---@param button CompactVendorFrameMerchantButtonTemplate
+    function ResetMerchantItemButton(_, button)
+        local merchantItem = button.merchantItem
+        if merchantItem then
+            merchantItem.parentButton = nil
+        end
+        button.merchantItem = nil
+        button:Hide()
     end
 
     ---@param button CompactVendorFrameMerchantButtonTemplate
     ---@param merchantItem? MerchantItem
     ---@return CompactVendorFrameMerchantButtonTemplate merchantButton
     function CreateMerchantItemButton(button, merchantItem)
-        RefreshAndUpdateMerchantItemButton(button, merchantItem)
+        button.merchantItem = merchantItem
+        merchantItem.parentButton = button
+        RefreshAndUpdateMerchantItemButton(button)
         return button
     end
 
@@ -2304,6 +2318,10 @@ local MerchantScanner do
                 itemData:Refresh()
                 if not itemData:IsPending() then
                     pending = pending - 1
+                end
+                local parentButton = itemData.parentButton
+                if parentButton then
+                    UpdateMerchantItemButton(parentButton)
                 end
             end
         end
@@ -2735,6 +2753,7 @@ local Frame do
         ---@alias ViewScrollBoxElementData MerchantItem
         ---@alias ViewPolyfillLayoutFunction fun(index: number, frame: ViewScrollBoxFrame, offset: number, scrollTarget: ViewScrollBoxScrollTarget): any
         ---@alias ViewPolyfillElementInitializerFunction fun(self: ViewScrollBoxElement, elementData: ViewScrollBoxElementData)
+        ---@alias ViewPolyfillElementResetterFunction fun(self: ViewScrollBoxElement, elementData: ViewScrollBoxElementData)
         ---@alias ViewPolyfillElementFactoryFunction fun(factory: fun(), elementData: ViewScrollBoxElementData)
 
         ---@class ViewPolyfill
@@ -2755,6 +2774,7 @@ local Frame do
         ---@field public GetExtentUntil fun(self: ViewPolyfill, scrollBox: ViewScrollBox, dataIndex: number): any
         ---@field public GetPanExtent fun(self: ViewPolyfill): boolean
         ---@field public SetElementInitializer fun(self: ViewPolyfill, frameTemplateOrFrameType: string, initializer: ViewPolyfillElementInitializerFunction)
+        ---@field public SetFrameFactoryResetter fun(self: ViewPolyfill, resetter?: ViewPolyfillElementResetterFunction)
 
         ---@alias ScrollBoxElementData MerchantItem
         ---@alias ScrollBoxView ViewPolyfill
@@ -2929,6 +2949,7 @@ local Frame do
             view.templateInfos[templateKey] = templateInfo
         end
         view:SetElementInitializer(templateKey, CreateMerchantItemButton)
+        view:SetFrameFactoryResetter(ResetMerchantItemButton)
         view:SetPadding(2, 2, 2, 2, 0)
         ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view)
 
@@ -4130,7 +4151,6 @@ local CompactVendorFrameMerchantButtonTemplate do
     end
 
     function CompactVendorFrameMerchantButtonTemplate:OnHide()
-        self.merchantItem = nil
         FrameUtil.UnregisterFrameForEvents(self, self.Events)
     end
 
