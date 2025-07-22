@@ -118,5 +118,6 @@
         "UIDROPDOWNMENU_OPEN_MENU",
         "UIDropDownMenu_SetInitializeFunction",
         "YES"
-    ]
+    ],
+    "Lua.type.weakUnionCheck": true
 }

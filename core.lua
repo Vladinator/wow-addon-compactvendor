@@ -1918,7 +1918,7 @@ local RefreshAndUpdateMerchantItemButton do
     end
 
     function MerchantItem:IsRequirementScannable()
-        return true -- TODO: the tooltip scanning and delay is a bit wonky, combined with filter toggling and full reloading more work needs to be done so the UX is better (for now turning this back off again)
+        return true
     end
 
     ---@param predicate? fun(requirementInfo: ItemRequirementInfo): boolean?

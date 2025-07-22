@@ -100,25 +100,30 @@ end
 
 ---@param options CompactVendorFilterDropDownRequirementOption[]
 ---@param requirementsInfo? CompactVendorFilterDropDownRequirementOptionValue[]
----@return table<string, boolean?> itemValue
+---@return table<string, number?>?
 local function FilterItemValue(options, requirementsInfo)
     if not requirementsInfo then
-        requirementsInfo = noRequirementValueTable ---@type CompactVendorFilterDropDownRequirementOptionValue[]
+        requirementsInfo = noRequirementValueTable
     end
-    local temp = {} ---@type table<string, boolean?>
-    for _, option in ipairs(options) do
-        if option.show and not option.checked then
-            local key = option.text
-            local found = false
-            for _, requirementInfo in ipairs(requirementsInfo) do
-                local text = getText(requirementInfo)
-                if key == text then
-                    found = true
-                    break
+    local count = 0
+    local temp ---@type table<string, number?>?
+    for _, requirementInfo in ipairs(requirementsInfo) do
+        local text = getText(requirementInfo)
+        for _, option in ipairs(options) do
+            if option.show and not option.checked and option.text == text then
+                if not temp then
+                    temp = {}
                 end
+                if temp[text] == nil then
+                    count = count + 1
+                    temp[text] = 0
+                end
+                temp[text] = temp[text] + 1
             end
-            temp[key] = found
         end
+    end
+    if temp and count ~= #requirementsInfo then
+        return
     end
     return temp
 end
@@ -156,11 +161,14 @@ local filter = CompactVendorFilterDropDownTemplate:New(
         return FilterItemValue(self.options, requirementsInfo)
     end,
     ---@param value CompactVendorFilterDropDownRequirementOptionValue
-    ---@param itemValue table<string, boolean?>
+    ---@param itemValue table<string, number?>?
     function(_, value, itemValue)
+        if not itemValue then
+            return
+        end
         local valueText = getText(value)
         local reqValue = itemValue[valueText]
-        return reqValue or reqValue == nil
+        return not reqValue or reqValue ~= 0
     end,
     true
 )
