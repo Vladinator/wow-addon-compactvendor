@@ -1528,7 +1528,7 @@ local RefreshAndUpdateMerchantItemButton do
     ---@field public canAfford boolean
     ---@field public costType MerchantItemCostType
     ---@field public itemLink? string
-    ---@field public merchantItemID? number
+    ---@field public merchantItemID number Note that both `merchantItemID` and `itemID` should be identical. The `merchantItemID` is primarily used to do things with the itemID (instead of the `itemLink`).
     ---@field public itemLinkOrID? string|number
     ---@field public isHeirloom boolean
     ---@field public isKnownHeirloom boolean
@@ -1538,7 +1538,7 @@ local RefreshAndUpdateMerchantItemButton do
     ---@field public extendedCostCount number
     ---@field public extendedCostItems MerchantItemCostItem[]
     ---@field public quality? number
-    ---@field public itemID number
+    ---@field public itemID number Note that both `merchantItemID` and `itemID` should be identical. The `merchantItemID` is primarily used to do things with the itemID (instead of the `itemLink`).
     ---@field public itemType string
     ---@field public itemSubType string
     ---@field public itemEquipLoc string
@@ -1694,7 +1694,7 @@ local RefreshAndUpdateMerchantItemButton do
         self.itemLink = GetMerchantItemLink(index)
         self.merchantItemID = GetMerchantItemID(index)
         self.itemLinkOrID = self.itemLink or self.merchantItemID
-        self.isHeirloom = self.merchantItemID and C_Heirloom and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
+        self.isHeirloom = C_Heirloom and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
         self.isKnownHeirloom = self.isHeirloom and C_Heirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
         self.showNonrefundablePrompt = C_MerchantFrame and C_MerchantFrame.IsMerchantItemRefundable and not C_MerchantFrame.IsMerchantItemRefundable(index)
         self.tintRed = not self.isPurchasable or (not self.isUsable and not self.isHeirloom)
@@ -1762,8 +1762,8 @@ local RefreshAndUpdateMerchantItemButton do
         self.isCosmeticBundleCollected,
         self.isCosmeticBundleNum,
         self.isCosmeticBundleNumMax = IsCosmeticBundleCollected(self.itemLink)
-        self.isToy = self.merchantItemID and C_ToyBox and C_ToyBox.GetToyInfo(self.merchantItemID) and true
-        self.isToyCollected = self.merchantItemID and PlayerHasToy and PlayerHasToy(self.merchantItemID)
+        self.isToy = C_ToyBox and C_ToyBox.GetToyInfo(self.merchantItemID) and true
+        self.isToyCollected = PlayerHasToy and PlayerHasToy(self.merchantItemID)
         self.isLearnable = self.isCosmetic or self.isCosmeticBundle or self:IsLearnable()
         self.tooltipRequirementsScannable = self:IsRequirementScannable()
         self.tooltipScannable = self.isLearnable or self.tooltipRequirementsScannable
@@ -1805,16 +1805,22 @@ local RefreshAndUpdateMerchantItemButton do
             ProcessTooltipData()
             return
         end
+        local updateMerchantItem = false
         local hyperlink = TooltipScanner:GetSanitizedHyperlinkForItemQuery(self.itemLink)
         local accepted = TooltipScanner:ScanHyperlinkCached(
             function(data)
                 self.tooltipData = CreateTooltipItem(data, self.itemLink)
                 ProcessTooltipData()
+                if not updateMerchantItem then
+                    return
+                end
+                self.parent:UpdateMerchantItemByID(self.merchantItemID, false, true)
             end,
             hyperlink
         )
         if self.tooltipData == nil then
             self.tooltipData = accepted
+            updateMerchantItem = true
         end
     end
 
