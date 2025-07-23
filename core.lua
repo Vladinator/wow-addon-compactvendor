@@ -1180,6 +1180,8 @@ local C_TooltipInfo do
 
 end
 
+local GetSanitizedHyperlinkForItemQuery
+local TooltipScannerState
 local TooltipScanner do
 
 	---@class TooltipScanEventFrame : Frame
@@ -1444,7 +1446,7 @@ local TooltipScanner do
         table.wipe(TooltipScanPool.cache)
     end
 
-	---@param callback fun(tooltipData: TooltipData)
+	---@param callback fun(isInstant: boolean, hyperlink: string, tooltipData: TooltipData)
 	---@param hyperlink string
 	---@param optionalArg1? number
 	---@param optionalArg2? number
@@ -1454,19 +1456,65 @@ local TooltipScanner do
         local guid = self:GetHyperlinkGUID(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
         local tooltipData = self.cache[guid]
         if tooltipData then
-            callback(tooltipData)
+            callback(true, hyperlink, tooltipData)
             return true
         end
         return self:ScanHyperlink(
             function(tooltipData)
                 self.cache[guid] = tooltipData
-                callback(tooltipData)
+                callback(false, hyperlink, tooltipData)
             end,
             hyperlink, optionalArg1, optionalArg2, hideVendorPrice
         )
     end
 
-    TooltipScanner = TooltipScanPool
+    ---@param hyperlink string
+    function GetSanitizedHyperlinkForItemQuery(hyperlink)
+        return TooltipScanPool:GetSanitizedHyperlinkForItemQuery(hyperlink)
+    end
+
+    ---@enum TooltipScannerState
+    TooltipScannerState = {
+        Queued = 1,
+        Declined = 2,
+        Pending = 3,
+        Done = 4,
+    }
+
+    ---@class TooltipScanner
+    TooltipScanner = {}
+
+    function TooltipScanner:ClearCache()
+        TooltipScanPool:ClearCache()
+    end
+
+    ---@param merchantItem MerchantItem
+    function TooltipScanner:ScanMerchantItem(merchantItem)
+        merchantItem.tooltipScannerState = TooltipScannerState.Queued
+        local tooltipScannerID = GetSanitizedHyperlinkForItemQuery(merchantItem.itemLink)
+        merchantItem.tooltipScannerID = tooltipScannerID
+        local isAccepted = TooltipScanPool:ScanHyperlinkCached(
+            function(isInstant, scannerID, tooltipData)
+                local targetMerchantItem = merchantItem
+                if targetMerchantItem.tooltipScannerID ~= scannerID then
+                    targetMerchantItem = targetMerchantItem.parent:GetMerchantItemByItemLink(scannerID)
+                end
+                if not targetMerchantItem then
+                    return
+                end
+                targetMerchantItem.tooltipScannerState = TooltipScannerState.Pending
+                targetMerchantItem:OnTooltipScanResponse(isInstant, tooltipData)
+            end,
+            tooltipScannerID
+        )
+        if not isAccepted then
+            merchantItem.tooltipScannerState = TooltipScannerState.Declined
+            return
+        end
+        if merchantItem.tooltipScannerState == TooltipScannerState.Queued then
+            merchantItem.tooltipScannerState = TooltipScannerState.Pending
+        end
+    end
 
 end
 
@@ -1561,7 +1609,9 @@ local RefreshAndUpdateMerchantItemButton do
     ---@field public isLearnable? boolean
     ---@field public tooltipRequirementsScannable? boolean
     ---@field public tooltipScannable? boolean
-    ---@field public tooltipData? TooltipItem|boolean
+    ---@field public tooltipScannerState? TooltipScannerState
+    ---@field public tooltipScannerID? string
+    ---@field public tooltipData? TooltipItem
     ---@field public hasRedRequirements? boolean
     ---@field public hasRequirementsInfo? ItemRequirementInfo[]
     ---@field public isLearned? boolean
@@ -1650,7 +1700,7 @@ local RefreshAndUpdateMerchantItemButton do
                 return true
             end
         end
-        if self.tooltipScannable and (self.tooltipData == nil or self.tooltipData == true) then
+        if self.tooltipScannable and self.tooltipScannerState == TooltipScannerState.Pending then
             return true
         end
         return false
@@ -1778,55 +1828,47 @@ local RefreshAndUpdateMerchantItemButton do
         if not self.tooltipScannable then
             return
         end
-        if self.tooltipData == true then
-            return
-        end
-        local function ProcessTooltipData()
-            local tooltipData = self.tooltipData
-            if not tooltipData or tooltipData == true then
-                return
-            end
-            if self.tooltipRequirementsScannable then
-                if self.hasRedRequirements == nil then
-                    self.hasRedRequirements,
-                    self.hasRequirementsInfo = tooltipData:HasRequirements()
-                end
-            end
-            if self.isLearnable then
-                if self.isLearned == nil then
-                    self.isLearned = tooltipData:IsLearned()
-                end
-                if self.isCollected == nil then
-                    self.isCollected,
-                    self.isCollectedNum,
-                    self.isCollectedNumMax = tooltipData:IsCollected()
-                end
-            end
-        end
         if self.tooltipData then
-            ProcessTooltipData()
+            self:RefreshTooltipData()
             return
         end
-        local merchantItemID = self.merchantItemID
-        local updateMerchantItem = false
-        local hyperlink = TooltipScanner:GetSanitizedHyperlinkForItemQuery(self.itemLink)
-        local accepted = TooltipScanner:ScanHyperlinkCached(
-            function(data)
-                if merchantItemID ~= self.merchantItemID then
-                    return
-                end
-                self.tooltipData = CreateTooltipItem(data, self.itemLink)
-                ProcessTooltipData()
-                if not updateMerchantItem then
-                    return
-                end
-                self.parent:UpdateMerchantItemByID(self.merchantItemID, false, true)
-            end,
-            hyperlink
-        )
-        if self.tooltipData == nil then
-            self.tooltipData = accepted
-            updateMerchantItem = true
+        if self.tooltipScannerState then
+            return
+        end
+        TooltipScanner:ScanMerchantItem(self)
+    end
+
+    function MerchantItem:RefreshTooltipData()
+        local tooltipData = self.tooltipData
+        if not tooltipData then
+            return
+        end
+        if self.tooltipRequirementsScannable then
+            if self.hasRedRequirements == nil then
+                self.hasRedRequirements,
+                self.hasRequirementsInfo = tooltipData:HasRequirements()
+            end
+        end
+        if self.isLearnable then
+            if self.isLearned == nil then
+                self.isLearned = tooltipData:IsLearned()
+            end
+            if self.isCollected == nil then
+                self.isCollected,
+                self.isCollectedNum,
+                self.isCollectedNumMax = tooltipData:IsCollected()
+            end
+        end
+    end
+
+    ---@param isInstant boolean
+    ---@param tooltipData TooltipData
+    function MerchantItem:OnTooltipScanResponse(isInstant, tooltipData)
+        self.tooltipScannerState = TooltipScannerState.Done
+        self.tooltipData = CreateTooltipItem(tooltipData, self.itemLink)
+        self:RefreshTooltipData()
+        if not isInstant then
+            self.parent:UpdateMerchantItemByID(self.merchantItemID, false, true)
         end
     end
 
@@ -2417,6 +2459,21 @@ local MerchantScanner do
             end
         end
         return collection
+    end
+
+    ---@param hyperlink string
+    ---@return MerchantItem? merchantItem
+    function MerchantScanner:GetMerchantItemByItemLink(hyperlink)
+        local sanitizedHyperlink = GetSanitizedHyperlinkForItemQuery(hyperlink)
+        for _, itemData in ipairs(self.collection) do
+            local itemLink = itemData.itemLink
+            if itemLink then
+                local sanitizedItemLink = GetSanitizedHyperlinkForItemQuery(itemLink)
+                if sanitizedHyperlink == sanitizedItemLink then
+                    return itemData
+                end
+            end
+        end
     end
 
     ---@param isReset? boolean
