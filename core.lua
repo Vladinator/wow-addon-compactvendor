@@ -1745,7 +1745,10 @@ local RefreshAndUpdateMerchantItemButton do
 
     ---@return string? name, number|string texture, number price, number stackCount, number numAvailable, boolean isPurchasable, boolean isUsable, boolean? hasExtendedCost, number? currencyID, number? spellID
     function MerchantItem:GetMerchantItemInfo()
-        local index = self:GetIndex()
+        local index, hasIndex = self:GetIndex()
+        if not hasIndex then
+            return ---@diagnostic disable-line: missing-return-value
+        end
         local temp = {GetMerchantItemInfo(index)}
         local arg1 = temp[1]
         if not arg1 then
@@ -1759,7 +1762,11 @@ local RefreshAndUpdateMerchantItemButton do
     end
 
     function MerchantItem:Refresh()
-        local index = self:GetIndex()
+        local index, hasIndex = self:GetIndex()
+        if not hasIndex then
+            self:Reset()
+            return
+        end
         self.name, self.texture, self.price, self.stackCount, self.numAvailable, self.isPurchasable, self.isUsable, self.extendedCost, self.currencyID, self.spellID = self:GetMerchantItemInfo()
         if not self.name then
             self:Reset()
@@ -1917,9 +1924,10 @@ local RefreshAndUpdateMerchantItemButton do
         end
     end
 
-    ---@return number index
+    ---@return number index, boolean hasIndex
     function MerchantItem:GetIndex()
-        return self.index
+        local index = self.index or 0
+        return index, index > 0
     end
 
     ---@param type MerchantItemCostType
@@ -2088,11 +2096,11 @@ local RefreshAndUpdateMerchantItemButton do
     ---@param button CompactVendorFrameMerchantButtonTemplate
     function UpdateMerchantItemButton(button)
         local merchantItem = button.merchantItem
-        local index = merchantItem and merchantItem:GetIndex()
-        if not merchantItem or not index then
+        if not merchantItem then
             button:SetID(0)
             return
         end
+        local index, hasIndex = merchantItem:GetIndex()
         button:SetID(index)
         button.Icon:SetItem(merchantItem, true)
         local text = GetTextForItem(merchantItem)
@@ -2129,6 +2137,10 @@ local RefreshAndUpdateMerchantItemButton do
                     backgroundColor = BackgroundColorPreset.Orange
                 end
             end
+        end
+        if not hasIndex then
+            backgroundColor = BackgroundColorPreset.None
+            textColor = ColorPreset.White
         end
         button:SetBackgroundColor(backgroundColor)
         button:SetTextColor(textColor)
@@ -4115,7 +4127,6 @@ local CompactVendorFrameMerchantButtonCostTemplate do
         self.Costs = {} ---@type CompactVendorFrameMerchantButtonCostButtonTemplate[]
         local prevCost ---@type CompactVendorFrameMerchantButtonCostButtonTemplate?
         for i = 1, 6 do -- hardcoded comfortable amount of frames
-            ---@diagnostic disable-next-line: assign-type-mismatch
             local cost = CreateFrame("Button", nil, self, "CompactVendorFrameMerchantButtonCostButtonTemplate") ---@type CompactVendorFrameMerchantButtonCostButtonTemplate
             if prevCost then
                 cost:SetPoint("RIGHT", prevCost, "LEFT", 0, 0)
@@ -4125,12 +4136,19 @@ local CompactVendorFrameMerchantButtonCostTemplate do
             prevCost = cost
             self.Costs[i] = cost
         end
+        self:HookScript("OnHide", function()
+            for _, cost in ipairs(self.Costs) do
+                cost:Hide()
+            end
+        end)
     end
 
     function CompactVendorFrameMerchantButtonCostTemplate:Update()
-        ---@diagnostic disable-next-line: assign-type-mismatch
         local merchantItem = self.parent.merchantItem
-        if not merchantItem then
+        local hasItemCost = merchantItem and merchantItem.extendedCost
+        local hasPriceCost = merchantItem and merchantItem.price and merchantItem.price > 0
+        if not hasItemCost and not hasPriceCost then
+            self:Hide()
             return
         end
         local pool ---@type CompactVendorFrameMerchantButtonCostTemplatePool?
@@ -4147,10 +4165,10 @@ local CompactVendorFrameMerchantButtonCostTemplate do
                 end
             end
         end
-        if merchantItem.extendedCost then
+        if hasItemCost then
             UpdateType("Item")
         end
-        if merchantItem.price and merchantItem.price > 0 then
+        if hasPriceCost then
             UpdateType("Money")
         end
         if not pool then
@@ -4277,7 +4295,10 @@ local CompactVendorFrameMerchantButtonTemplate do
         if not merchantItem then
             return
         end
-        local index = merchantItem:GetIndex()
+        local index, hasIndex = merchantItem:GetIndex()
+        if not hasIndex then
+            return
+        end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetMerchantItem(index)
         GameTooltip_ShowCompareItem()
@@ -4297,7 +4318,11 @@ local CompactVendorFrameMerchantButtonTemplate do
             return
         end
         local merchantItem = self.merchantItem
-        if not merchantItem then
+        local _, hasIndex ---@type number, boolean
+        if merchantItem then
+            _, hasIndex = merchantItem:GetIndex()
+        end
+        if not merchantItem or not hasIndex then
             return
         end
         if self ~= GameTooltip:GetOwner() then
@@ -4375,7 +4400,10 @@ local CompactVendorFrameMerchantButtonTemplate do
         if not merchantItem then
             return
         end
-        local index = merchantItem:GetIndex()
+        local index, hasIndex = merchantItem:GetIndex()
+        if not hasIndex then
+            return
+        end
         local stackCount = merchantItem.stackCount or 1
         local maxStackCount = merchantItem.maxStackCount or 1
         quantity = quantity or stackCount
