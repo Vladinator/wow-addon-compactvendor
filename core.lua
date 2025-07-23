@@ -1182,6 +1182,7 @@ end
 
 local GetSanitizedHyperlinkForItemQuery
 local TooltipScannerState
+local TooltipScannerStateIsPending
 local TooltipScanner do
 
 	---@class TooltipScanEventFrame : Frame
@@ -1417,9 +1418,6 @@ local TooltipScanner do
 	---@param hideVendorPrice? boolean
 	---@return boolean accepted
 	function TooltipScanPool:ScanHyperlink(callback, hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
-		if not self:CanScanHyperlink(hyperlink) then
-			return false
-		end
 		local tooltip = self:Acquire()
 		return tooltip:ScanHyperlink(
 			function(tooltipData)
@@ -1430,9 +1428,6 @@ local TooltipScanner do
 		)
 	end
 
-    ---@type table<string, TooltipData?>
-    TooltipScanPool.cache = {}
-
     ---@param hyperlink string
     ---@param optionalArg1? number
     ---@param optionalArg2? number
@@ -1442,8 +1437,24 @@ local TooltipScanner do
         return format("%s\1%s\1%s\1%s", hyperlink, optionalArg1 or "", optionalArg2 or "", hideVendorPrice and "true" or "false")
     end
 
+    ---@alias TooltipScanPoolCache { tooltipData: TooltipData?, callbacks: table<function, true?> }
+
+    ---@type table<string, TooltipScanPoolCache>
+    TooltipScanPool.cache = {}
+
     function TooltipScanPool:ClearCache()
-        table.wipe(TooltipScanPool.cache)
+        table.wipe(self.cache)
+    end
+
+    ---@param cache TooltipScanPoolCache
+    ---@param isInstant boolean
+    ---@param hyperlink string
+    ---@param tooltipData TooltipData
+    local function ProcessCallbacks(cache, isInstant, hyperlink, tooltipData)
+        for callback, _ in pairs(cache.callbacks) do
+            callback(isInstant, hyperlink, tooltipData)
+        end
+        table.wipe(cache.callbacks)
     end
 
 	---@param callback fun(isInstant: boolean, hyperlink: string, tooltipData: TooltipData)
@@ -1453,16 +1464,27 @@ local TooltipScanner do
 	---@param hideVendorPrice? boolean
 	---@return boolean accepted
     function TooltipScanPool:ScanHyperlinkCached(callback, hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+        if not self:CanScanHyperlink(hyperlink) then
+            return false
+        end
         local guid = self:GetHyperlinkGUID(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
-        local tooltipData = self.cache[guid]
-        if tooltipData then
-            callback(true, hyperlink, tooltipData)
+        local cache = self.cache[guid]
+        if cache then
+            local tooltipData = cache.tooltipData
+            if tooltipData then
+                cache.callbacks[callback] = true
+                ProcessCallbacks(cache, true, hyperlink, tooltipData)
+            else
+                cache.callbacks[callback] = true
+            end
             return true
         end
+        cache = { tooltipData = nil, callbacks = { [callback] = true } }
+        self.cache[guid] = cache
         return self:ScanHyperlink(
             function(tooltipData)
-                self.cache[guid] = tooltipData
-                callback(false, hyperlink, tooltipData)
+                cache.tooltipData = tooltipData
+                ProcessCallbacks(cache, false, hyperlink, tooltipData)
             end,
             hyperlink, optionalArg1, optionalArg2, hideVendorPrice
         )
@@ -1481,6 +1503,11 @@ local TooltipScanner do
         Done = 4,
     }
 
+    ---@param state? TooltipScannerState
+    function TooltipScannerStateIsPending(state)
+        return state == TooltipScannerState.Queued or state == TooltipScannerState.Pending
+    end
+
     ---@class TooltipScanner
     TooltipScanner = {}
 
@@ -1490,9 +1517,15 @@ local TooltipScanner do
 
     ---@param merchantItem MerchantItem
     function TooltipScanner:ScanMerchantItem(merchantItem)
-        merchantItem.tooltipScannerState = TooltipScannerState.Queued
+        if merchantItem.tooltipScannerState then
+            return
+        end
         local tooltipScannerID = GetSanitizedHyperlinkForItemQuery(merchantItem.itemLink)
+        if merchantItem.tooltipScannerID ~= tooltipScannerID then
+            merchantItem:ResetTooltipData()
+        end
         merchantItem.tooltipScannerID = tooltipScannerID
+        merchantItem.tooltipScannerState = TooltipScannerState.Queued
         local isAccepted = TooltipScanPool:ScanHyperlinkCached(
             function(isInstant, scannerID, tooltipData)
                 local targetMerchantItem = merchantItem
@@ -1700,7 +1733,7 @@ local RefreshAndUpdateMerchantItemButton do
                 return true
             end
         end
-        if self.tooltipScannable and self.tooltipScannerState == TooltipScannerState.Pending then
+        if self.tooltipScannable and TooltipScannerStateIsPending(self.tooltipScannerState) then
             return true
         end
         return false
@@ -1828,19 +1861,23 @@ local RefreshAndUpdateMerchantItemButton do
         if not self.tooltipScannable then
             return
         end
-        if self.tooltipData then
-            self:RefreshTooltipData()
-            return
-        end
-        if self.tooltipScannerState then
-            return
-        end
         TooltipScanner:ScanMerchantItem(self)
+    end
+
+    function MerchantItem:ResetTooltipData()
+        self.tooltipData = nil
+        self.hasRedRequirements,
+        self.hasRequirementsInfo = nil, nil
+        self.isLearned = nil
+        self.isCollected,
+        self.isCollectedNum,
+        self.isCollectedNumMax = nil, nil, nil
     end
 
     function MerchantItem:RefreshTooltipData()
         local tooltipData = self.tooltipData
         if not tooltipData then
+            self:ResetTooltipData()
             return
         end
         if self.tooltipRequirementsScannable then
@@ -1848,6 +1885,9 @@ local RefreshAndUpdateMerchantItemButton do
                 self.hasRedRequirements,
                 self.hasRequirementsInfo = tooltipData:HasRequirements()
             end
+        else
+            self.hasRedRequirements,
+            self.hasRequirementsInfo = nil, nil
         end
         if self.isLearnable then
             if self.isLearned == nil then
@@ -1858,6 +1898,11 @@ local RefreshAndUpdateMerchantItemButton do
                 self.isCollectedNum,
                 self.isCollectedNumMax = tooltipData:IsCollected()
             end
+        else
+            self.isLearned = nil
+            self.isCollected,
+            self.isCollectedNum,
+            self.isCollectedNumMax = nil, nil, nil
         end
     end
 
@@ -1868,7 +1913,7 @@ local RefreshAndUpdateMerchantItemButton do
         self.tooltipData = CreateTooltipItem(tooltipData, self.itemLink)
         self:RefreshTooltipData()
         if not isInstant then
-            self.parent:UpdateMerchantItemByID(self.merchantItemID, false, true)
+            self.parent:UpdateMerchantThrottled()
         end
     end
 
