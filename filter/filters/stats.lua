@@ -1,24 +1,78 @@
 local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate ---@type CompactVendorFilterDropDownTemplate
 
+---@type table<string, string?>
+local statTextMap = {
+    ITEM_MOD_HOLY_RESISTANCE_SHORT = "RESISTANCE1_NAME",
+    ITEM_MOD_FIRE_RESISTANCE_SHORT = "RESISTANCE2_NAME",
+    ITEM_MOD_NATURE_RESISTANCE_SHORT = "RESISTANCE3_NAME",
+    ITEM_MOD_FROST_RESISTANCE_SHORT = "RESISTANCE4_NAME",
+    ITEM_MOD_SHADOW_RESISTANCE_SHORT = "RESISTANCE5_NAME",
+    ITEM_MOD_ARCANE_RESISTANCE_SHORT = "RESISTANCE6_NAME",
+}
+
+---@param stat string
+local function GetStatText(stat)
+    if not stat then
+        return tostring(stat)
+    end
+    local text = _G[stat] ---@type string?
+    if text then
+        return text
+    end
+    text = statTextMap[stat]
+    if not text then
+        return stat
+    end
+    text = _G[text] ---@type string?
+    if text then
+        return text
+    end
+    return stat
+end
+
 ---@alias StatTablePolyfill table<string, number?>
 
 ---@type StatTablePolyfill
 local statTable = {}
+
+local function ReMapStatTable()
+    local remap ---@type table<string, string>?
+    for stat, _ in pairs(statTable) do
+        local newStat = statTextMap[stat]
+        if newStat then
+            if not remap then
+                remap = {}
+            end
+            remap[stat] = newStat
+        end
+    end
+    if not remap then
+        return
+    end
+    for stat, newStat in pairs(remap) do
+        local value = statTable[stat]
+        statTable[stat] = nil
+        statTable[newStat] = value
+    end
+end
 
 ---@param itemLink string
 ---@return StatTablePolyfill? statTable
 local function UpdateItemStatTable(itemLink)
     if C_Item.GetItemStats then
         statTable = C_Item.GetItemStats(itemLink)
+        statTable = statTable or {}
+        ReMapStatTable()
         return statTable
     end
     local GetItemStats = GetItemStats ---@diagnostic disable-line: undefined-global
     if GetItemStats then
-        if statTable then
-            table.wipe(statTable)
-        end
+        statTable = statTable or {}
+        table.wipe(statTable)
         statTable = GetItemStats(itemLink, statTable)
+        statTable = statTable or {}
     end
+    ReMapStatTable()
     return statTable
 end
 
@@ -62,7 +116,7 @@ local filter = CompactVendorFilterDropDownTemplate:New(
             ---@type CompactVendorFilterDropDownStatsOption
             local option = self:GetOption(value, true) ---@diagnostic disable-line: assign-type-mismatch
             option.value = value
-            option.text = tostring(_G[value])
+            option.text = GetStatText(value)
             option.show = true
         end
     end,
