@@ -1,5 +1,8 @@
 local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate ---@type CompactVendorFilterDropDownTemplate
 
+local ns = select(2, ...) ---@class CompactVendorNS
+local ItemRequirementType = ns.ItemRequirementType
+
 ---@alias CompactVendorFilterDropDownRequirementOptionValue false|string
 
 ---@class CompactVendorFilterDropDownRequirementOption : CompactVendorFilterDropDownTemplateOption
@@ -17,6 +20,8 @@ local Format = {
     Specialization = "Specialization: %s",
     RenownP = "Renown: %s (%s)",
     Renown = "Renown: %s",
+    RenownExtraP = "Renown: %s (%s) and %s",
+    RenownExtra = "Renown: %s and %s",
 }
 
 local IconSize = 14
@@ -31,22 +36,24 @@ local Icon = {
 local function getRequirementInfoText(requirementInfo, noIcon)
     local typeInfo = requirementInfo.type
     local text ---@type string?
-    if typeInfo == 1 then
+    if typeInfo == ItemRequirementType.Profession then
         text = format(requirementInfo.amount and Format.ProfessionP or Format.Profession, requirementInfo.requires, requirementInfo.amount)
-    elseif typeInfo == 2 then
+    elseif typeInfo == ItemRequirementType.Level then
         text = format(Format.Level, requirementInfo.level)
-    elseif typeInfo == 3 then
+    elseif typeInfo == ItemRequirementType.Rating then
         text = format(Format.Rating, requirementInfo.rating)
-    elseif typeInfo == 4 then
+    elseif typeInfo == ItemRequirementType.Achievement then
         text = format(Format.Achievement, requirementInfo.achievement)
-    elseif typeInfo == 5 then
+    elseif typeInfo == ItemRequirementType.Guild then
         text = format(requirementInfo.level and Format.GuildP or Format.Guild, requirementInfo.guild, requirementInfo.level)
-    elseif typeInfo == 6 then
+    elseif typeInfo == ItemRequirementType.Reputation then
         text = format(Format.ReputationP, requirementInfo.reputation, requirementInfo.rank)
-    elseif typeInfo == 7 then
+    elseif typeInfo == ItemRequirementType.Specialization then
         text = format(Format.Specialization, requirementInfo.specialization)
-    elseif typeInfo == 8 then
+    elseif typeInfo == ItemRequirementType.Renown then
         text = format(requirementInfo.rank and Format.RenownP or Format.Renown, requirementInfo.renown, requirementInfo.rank)
+    elseif typeInfo == ItemRequirementType.RenownAndExtra then
+        text = requirementInfo.requires and format(Format.RenownExtraP, requirementInfo.renown, requirementInfo.rank, requirementInfo.requires) or format(Format.RenownExtra, requirementInfo.renown, requirementInfo.requires)
     end
     if not text then
         text = requirementInfo.raw

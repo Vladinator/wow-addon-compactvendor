@@ -876,7 +876,10 @@ local IsTooltipTextPending do
         Reputation = 6,
         Specialization = 7,
         Renown = 8,
+        RenownAndExtra = 9,
     }
+
+    ns.ItemRequirementType = ItemRequirementType
 
     ---@class ItemRequirementInfo
     ---@field public raw string
@@ -897,7 +900,10 @@ local IsTooltipTextPending do
 
     ---@type { [1]: string, [2]: ItemRequirementType, [3]: string, [4]: string }[]
     local ItemRequirements = {
+        { "Requires %s and Renown Rank %d with the %s.", ItemRequirementType.RenownAndExtra, "requires", "rank", "renown" }, -- TODO: localization
+        { "Requires Renown Rank %d with the %s and to primarily wear %s.", ItemRequirementType.RenownAndExtra, "rank", "renown", "requires" }, -- TODO: localization
         { "Requires Renown Rank %d with the %s by a character on this account.", ItemRequirementType.Renown, "rank", "renown" }, -- TODO: localization
+        { "Requires Renown Rank %d with the %s.", ItemRequirementType.Renown, "rank", "renown" }, -- TODO: localization
         { ITEM_REQ_ARENA_RATING, ItemRequirementType.Rating, "rating" },
         { ITEM_REQ_PURCHASE_ACHIEVEMENT, ItemRequirementType.Achievement, "achievement" },
         { ITEM_REQ_PURCHASE_GUILD, ItemRequirementType.Guild, "guild" },
@@ -1109,7 +1115,7 @@ local C_TooltipInfo do
     ---@type BackupTooltipScanner?
     local BackupTooltipScanner
 
-    local createBackup = C_TooltipInfo.GetHyperlink == noop
+    local createBackup = C_TooltipInfo.GetHyperlink == noop or C_TooltipInfo.GetMerchantItem == noop
 
     if createBackup then
 
@@ -1176,6 +1182,16 @@ local C_TooltipInfo do
             end
         end
 
+        if C_TooltipInfo.GetMerchantItem == noop then
+            ---@param merchantItemIndex number
+            ---@return TooltipData tooltipData
+            ---@diagnostic disable-next-line: duplicate-set-field
+            function C_TooltipInfo.GetMerchantItem(merchantItemIndex)
+                local hyperlink = GetMerchantItemLink(merchantItemIndex)
+                return BackupTooltipScanner:ScanHyperlink(hyperlink)
+            end
+        end
+
     end
 
 end
@@ -1195,10 +1211,14 @@ local TooltipScanner do
 		end
 	end)
 
+    ---@alias TooltipDataHandlerTooltipInfoGetterName string|"GetHyperlink"|"GetMerchantItem"
+
+    ---@alias TooltipDataHandlerTooltipInfoGetterArgs table
+
 	---@class TooltipDataHandlerTooltipInfo
 	---@field public tooltipData? TooltipData If provided, the getters are ignored, otherwise provide the getter fields if tooltipData is missing.
-	---@field public getterName? string The method name like `GetHyperlink` which then gets used like `C_TooltipInfo.GetHyperlink()`.
-	---@field public getterArgs? table The method arguments which gets unpacked when the getter method is called.
+	---@field public getterName? TooltipDataHandlerTooltipInfoGetterName The method name like `GetHyperlink` which then gets used like `C_TooltipInfo.GetHyperlink()`.
+	---@field public getterArgs? TooltipDataHandlerTooltipInfoGetterArgs The method arguments which gets unpacked when the getter method is called.
 	---@field public append? boolean If true, the tooltip will not be cleared and the backdrop style (Azerite and Corrupted) will not be set.
 	---@field public excludeLines? Enum.TooltipDataLineType[] Table of line types to exclude from the tooltip.
 	---@field public tooltipPostCall? fun(self: TooltipScanObjectMixin) Callback for the tooltip after it has processed the info.
@@ -1243,13 +1263,10 @@ local TooltipScanner do
 		return true
 	end
 
-	---@param callback fun(tooltipData: TooltipData, tooltip: TooltipScanObjectMixin)
-	---@param hyperlink string
-	---@param optionalArg1? number
-	---@param optionalArg2? number
-	---@param hideVendorPrice? boolean
-	---@return boolean accepted
-	function TooltipScanObjectMixin:ScanHyperlink(callback, hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+    ---@param callback fun(tooltipData: TooltipData, tooltip: TooltipScanObjectMixin)
+    ---@param getterName TooltipDataHandlerTooltipInfoGetterName
+    ---@param ... any
+    function TooltipScanObjectMixin:Scan(callback, getterName, ...)
 		local done = false
 		local function postCallback()
 			if done then
@@ -1264,12 +1281,29 @@ local TooltipScanner do
 		end
 		---@type TooltipDataHandlerTooltipInfo
 		local processInfo = {
-			getterName = "GetHyperlink",
-			getterArgs = { hyperlink, optionalArg1, optionalArg2, hideVendorPrice },
+			getterName = getterName,
+			getterArgs = { ... },
 			tooltipPostCall = postCallback,
 			rebuildPostCall = postCallback,
 		}
 		return self:ProcessInfo(processInfo)
+    end
+
+	---@param callback fun(tooltipData: TooltipData, tooltip: TooltipScanObjectMixin)
+	---@param hyperlink string
+	---@param optionalArg1? number
+	---@param optionalArg2? number
+	---@param hideVendorPrice? boolean
+	---@return boolean accepted
+	function TooltipScanObjectMixin:ScanHyperlink(callback, hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+        return self:Scan(callback, "GetHyperlink", hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
+	end
+
+	---@param callback fun(tooltipData: TooltipData, tooltip: TooltipScanObjectMixin)
+	---@param merchantItemIndex number
+	---@return boolean accepted
+	function TooltipScanObjectMixin:ScanMerchantItem(callback, merchantItemIndex)
+		return self:Scan(callback, "GetMerchantItem", merchantItemIndex)
 	end
 
 	---@return TooltipDataHandlerTooltipInfo? tooltipInfo
@@ -1389,7 +1423,7 @@ local TooltipScanner do
 		end
 	)
 
-	---@param hyperlink string
+	---@param hyperlink? string
 	function TooltipScanPool:CanScanHyperlink(hyperlink)
 		if type(hyperlink) ~= "string" then
 			return false
@@ -1428,16 +1462,32 @@ local TooltipScanner do
 		)
 	end
 
-    ---@param hyperlink string
-    ---@param optionalArg1? number
-    ---@param optionalArg2? number
-    ---@param hideVendorPrice? boolean
+	---@param callback fun(tooltipData: TooltipData)
+	---@param merchantItemIndex number
+	---@return boolean accepted
+	function TooltipScanPool:ScanMerchantItem(callback, merchantItemIndex)
+		local tooltip = self:Acquire()
+		return tooltip:ScanMerchantItem(
+			function(tooltipData)
+				self:Release(tooltip)
+				callback(tooltipData)
+			end,
+			merchantItemIndex
+		)
+	end
+
     ---@return string guid
-    function TooltipScanPool:GetHyperlinkGUID(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
-        return format("%s\1%s\1%s\1%s", hyperlink, optionalArg1 or "", optionalArg2 or "", hideVendorPrice and "true" or "false")
+    function TooltipScanPool:CreateGUID(...)
+        return table.concat({tostringall(...)}, "\1")
     end
 
-    ---@alias TooltipScanPoolCache { tooltipData: TooltipData?, callbacks: table<function, true?> }
+    ---@alias TooltipScanPoolHyperlinkCallback fun(isInstant: boolean, hyperlink: string, tooltipData: TooltipData)
+
+    ---@alias TooltipScanPoolMerchantCallback fun(isInstant: boolean, merchantItemIndex: number, tooltipData: TooltipData)
+
+    ---@alias TooltipScanPoolCallback TooltipScanPoolHyperlinkCallback|TooltipScanPoolMerchantCallback
+
+    ---@alias TooltipScanPoolCache { tooltipData: TooltipData?, callbacks: table<TooltipScanPoolCallback, true?> }
 
     ---@type table<string, TooltipScanPoolCache>
     TooltipScanPool.cache = {}
@@ -1446,18 +1496,43 @@ local TooltipScanner do
         table.wipe(self.cache)
     end
 
+    ---@param guid string
+    ---@param callback TooltipScanPoolCallback
+    ---@return TooltipScanPoolCache cache, boolean cacheExisted
+    function TooltipScanPool:GetCache(guid, callback)
+        local cache = self.cache[guid]
+        if cache then
+            cache.callbacks[callback] = true
+            return cache, true
+        end
+        cache = { tooltipData = nil, callbacks = { [callback] = true } }
+        self.cache[guid] = cache
+        return cache, false
+    end
+
     ---@param cache TooltipScanPoolCache
     ---@param isInstant boolean
-    ---@param hyperlink string
+    ---@param query string|number
     ---@param tooltipData TooltipData
-    local function ProcessCallbacks(cache, isInstant, hyperlink, tooltipData)
+    function TooltipScanPool:ProcessCallbacks(cache, isInstant, query, tooltipData)
         for callback, _ in pairs(cache.callbacks) do
-            callback(isInstant, hyperlink, tooltipData)
+            callback(isInstant, query, tooltipData)
         end
         table.wipe(cache.callbacks)
     end
 
-	---@param callback fun(isInstant: boolean, hyperlink: string, tooltipData: TooltipData)
+    ---@param cache TooltipScanPoolCache
+    ---@param isInstant boolean
+    ---@param query string|number
+    function TooltipScanPool:ProcessCache(cache, isInstant, query)
+        local tooltipData = cache.tooltipData
+        if not tooltipData then
+            return
+        end
+        self:ProcessCallbacks(cache, isInstant, query, tooltipData)
+    end
+
+	---@param callback TooltipScanPoolHyperlinkCallback
 	---@param hyperlink string
 	---@param optionalArg1? number
 	---@param optionalArg2? number
@@ -1467,26 +1542,41 @@ local TooltipScanner do
         if not self:CanScanHyperlink(hyperlink) then
             return false
         end
-        local guid = self:GetHyperlinkGUID(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
-        local cache = self.cache[guid]
-        if cache then
-            local tooltipData = cache.tooltipData
-            if tooltipData then
-                cache.callbacks[callback] = true
-                ProcessCallbacks(cache, true, hyperlink, tooltipData)
-            else
-                cache.callbacks[callback] = true
-            end
+        local guid = self:CreateGUID("hyperlink", hyperlink, optionalArg1 or "", optionalArg2 or "", hideVendorPrice or false)
+        local cache, cacheExisted = self:GetCache(guid, callback)
+        if cacheExisted then
+            self:ProcessCache(cache, true, hyperlink)
             return true
         end
-        cache = { tooltipData = nil, callbacks = { [callback] = true } }
-        self.cache[guid] = cache
         return self:ScanHyperlink(
             function(tooltipData)
                 cache.tooltipData = tooltipData
-                ProcessCallbacks(cache, false, hyperlink, tooltipData)
+                self:ProcessCache(cache, false, hyperlink)
             end,
             hyperlink, optionalArg1, optionalArg2, hideVendorPrice
+        )
+    end
+
+	---@param callback TooltipScanPoolMerchantCallback
+	---@param merchantItemIndex number
+	---@return boolean accepted
+    function TooltipScanPool:ScanMerchantItemCached(callback, merchantItemIndex)
+        local hyperlink = GetMerchantItemLink(merchantItemIndex)
+        if not self:CanScanHyperlink(hyperlink) then
+            return false
+        end
+        local guid = self:CreateGUID("merchantItemIndex", merchantItemIndex)
+        local cache, cacheExisted = self:GetCache(guid, callback)
+        if cacheExisted then
+            self:ProcessCache(cache, true, merchantItemIndex)
+            return true
+        end
+        return self:ScanMerchantItem(
+            function(tooltipData)
+                cache.tooltipData = tooltipData
+                self:ProcessCache(cache, false, merchantItemIndex)
+            end,
+            merchantItemIndex
         )
     end
 
@@ -1511,6 +1601,10 @@ local TooltipScanner do
     ---@class TooltipScanner
     TooltipScanner = {}
 
+    -- TODO: "merchant" seem to return results too early (the tooltip loads, but additional merchant requirements do not load in time) so using the hyperlink approach for now (there is also the issue of localization when using merchant tooltips...)
+    ---@type "hyperlink"|"merchant"
+    TooltipScanner.UseTooltipType = "hyperlink"
+
     function TooltipScanner:ClearCache()
         TooltipScanPool:ClearCache()
     end
@@ -1520,26 +1614,41 @@ local TooltipScanner do
         if merchantItem.tooltipScannerState then
             return
         end
-        local tooltipScannerID = GetSanitizedHyperlinkForItemQuery(merchantItem.itemLink)
+        local scanMerchantTooltip = self.UseTooltipType == "merchant"
+        local tooltipScannerID = scanMerchantTooltip and merchantItem.index or GetSanitizedHyperlinkForItemQuery(merchantItem.itemLink)
         if merchantItem.tooltipScannerID ~= tooltipScannerID then
             merchantItem:ResetTooltipData()
         end
         merchantItem.tooltipScannerID = tooltipScannerID
         merchantItem.tooltipScannerState = TooltipScannerState.Queued
-        local isAccepted = TooltipScanPool:ScanHyperlinkCached(
-            function(isInstant, scannerID, tooltipData)
-                local targetMerchantItem = merchantItem
-                if targetMerchantItem.tooltipScannerID ~= scannerID then
-                    targetMerchantItem = targetMerchantItem.parent:GetMerchantItemByItemLink(scannerID)
-                end
-                if not targetMerchantItem then
-                    return
-                end
-                targetMerchantItem.tooltipScannerState = TooltipScannerState.Pending
-                targetMerchantItem:OnTooltipScanResponse(isInstant, tooltipData)
-            end,
-            tooltipScannerID
-        )
+        local parent = merchantItem.parent
+        ---@param scannerID string|number
+        local function getMerchantItem(scannerID)
+            if scanMerchantTooltip then
+                return parent:GetMerchantItemByMerchantIndex(scannerID)
+            end
+            return parent:GetMerchantItemByItemLink(scannerID)
+        end
+        ---@param isInstant boolean
+        ---@param scannerID string|number
+        ---@param tooltipData TooltipData
+        local function callback(isInstant, scannerID, tooltipData)
+            local targetMerchantItem = merchantItem
+            if targetMerchantItem.tooltipScannerID ~= scannerID then
+                targetMerchantItem = getMerchantItem(scannerID)
+            end
+            if not targetMerchantItem then
+                return
+            end
+            targetMerchantItem.tooltipScannerState = TooltipScannerState.Pending
+            targetMerchantItem:OnTooltipScanResponse(isInstant, tooltipData)
+        end
+        local isAccepted ---@type boolean
+        if scanMerchantTooltip then
+            isAccepted = TooltipScanPool:ScanMerchantItemCached(callback, tooltipScannerID)
+        else
+            isAccepted = TooltipScanPool:ScanHyperlinkCached(callback, tooltipScannerID)
+        end
         if not isAccepted then
             merchantItem.tooltipScannerState = TooltipScannerState.Declined
             return
@@ -1643,7 +1752,7 @@ local RefreshAndUpdateMerchantItemButton do
     ---@field public tooltipRequirementsScannable? boolean
     ---@field public tooltipScannable? boolean
     ---@field public tooltipScannerState? TooltipScannerState
-    ---@field public tooltipScannerID? string
+    ---@field public tooltipScannerID? string|number
     ---@field public tooltipData? TooltipItem
     ---@field public hasRedRequirements? boolean
     ---@field public hasRequirementsInfo? ItemRequirementInfo[]
@@ -2529,6 +2638,16 @@ local MerchantScanner do
                 if sanitizedHyperlink == sanitizedItemLink then
                     return itemData
                 end
+            end
+        end
+    end
+
+    ---@param merchantItemIndex number
+    ---@return MerchantItem? merchantItem
+    function MerchantScanner:GetMerchantItemByMerchantIndex(merchantItemIndex)
+        for _, itemData in ipairs(self.collection) do
+            if merchantItemIndex == itemData.index then
+                return itemData
             end
         end
     end
