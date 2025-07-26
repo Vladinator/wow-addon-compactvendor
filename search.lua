@@ -1,10 +1,8 @@
----@diagnostic disable: deprecated
-
 local strcmputf8i = strcmputf8i ---@type fun(str1: string|number, str2: string|number): result: number
-local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant
-local GetItemClassInfo = GetItemClassInfo or C_Item.GetItemClassInfo
-local GetItemSubClassInfo = GetItemSubClassInfo or C_Item.GetItemSubClassInfo
-local GetItemInfo = GetItemInfo or C_Item.GetItemInfo
+local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant ---@diagnostic disable-line: deprecated
+local GetItemClassInfo = GetItemClassInfo or C_Item.GetItemClassInfo ---@diagnostic disable-line: deprecated
+local GetItemSubClassInfo = GetItemSubClassInfo or C_Item.GetItemSubClassInfo ---@diagnostic disable-line: deprecated
+local GetItemInfo = GetItemInfo or C_Item.GetItemInfo ---@diagnostic disable-line: deprecated
 
 local ns = select(2, ...) ---@class CompactVendorNS
 
@@ -22,6 +20,7 @@ ns.Search.BindType = {
 ---|"e" Equipment Location
 ---|"n" Item Name
 ---|"i" Item Level
+---|"l" Level Requirement
 ---|"q" Item Quality
 ---|"b" Item Bind Type
 ---|"x" Expansion
@@ -34,84 +33,100 @@ ns.Search.BindType = {
 ---|"=" Eq
 ---|"~=" Ne
 
+local CompactVendorSearchModTypePattern = "^([tTeEnNiIlLqQbBxX]):(.*)$"
+
+local CompactVendorSearchModOperatorPattern = "^([!]*)([<>~=]*)(.*)$"
+
+---@param str string
+local function GetStringChars(str)
+    local t = {} ---@type string[]
+    for c in str:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+        t[#t + 1] = c
+    end
+    return t
+end
+
 ---@param query string
----@return string[] parts, (CompactVendorSearchModType|nil)[]? mods
+local function SplitString(query)
+    local parts = {} ---@type string[]
+    local chars = GetStringChars(query)
+    local inQuote = false
+    local temp = {} ---@type string[]
+    ---@param eof? boolean
+    local function flush(eof)
+        if not temp[1] then
+            return
+        end
+        if eof and inQuote then
+            local tempParts = SplitString(table.concat(temp))
+            for i = 1, #tempParts do
+                if i == 1 then
+                    parts[#parts + 1] = format('"%s', tempParts[i])
+                else
+                    parts[#parts + 1] = tempParts[i]
+                end
+            end
+        else
+            parts[#parts + 1] = table.concat(temp)
+        end
+        table.wipe(temp)
+    end
+    for i = 1, #chars do
+        local chr = chars[i]
+        if chr == '"' then
+            if inQuote then
+                inQuote = false
+                flush()
+            else
+                inQuote = true
+                flush()
+            end
+        elseif chr == " " and not inQuote then
+            flush()
+        else
+            temp[#temp + 1] = chr
+        end
+    end
+    flush(true)
+    return parts
+end
+
+---@param query string
+---@return string[] parts, CompactVendorSearchModType[]? mods
 local function SplitQuery(query)
-    local parts = { strsplit(" ", query) }
-    local hasQuotes = false
+    local parts = SplitString(query)
     local hasMods = false
     for i = 1, #parts do
-        local part = parts[i] ---@type string
-        local modStart, modEnd = part:find("^([^:]+):")
-        local modQuote = modEnd and part:sub(modEnd + 1, modEnd + 1) == '"'
-        if modQuote or part:sub(1, 1) == '"' then
-            hasQuotes = true
-        end
-        if modStart then
+        local part = parts[i]
+        local modPart = part:match(CompactVendorSearchModTypePattern)
+        if modPart then
             hasMods = true
-        end
-        if hasQuotes and hasMods then
             break
         end
     end
-    if not hasQuotes and not hasMods then
-        return { query:trim() }
+    if not hasMods then
+        return parts
     end
     hasMods = false
-    local inQuote ---@type boolean?
     local words = {} ---@type string[]
     local wordsIndex = 0
-    local temp = {} ---@type string[]
-    local tempIndex = 0
     local mods = {} ---@type string[]
     for i = 1, #parts do
-        local part = parts[i] ---@type string
-        local add = 1
-        if not inQuote then
-            local modStart, modEnd = part:find("^([^:]+):")
-            local modQuote = modEnd and part:sub(modEnd + 1, modEnd + 1) == '"'
-            if modQuote or part:sub(1, 1) == '"' then
-                add = 2
-                inQuote = true
-                if modStart then
-                    add = 3
-                else
-                    part = part:sub(2)
-                end
-            elseif modStart then
-                add = 3
-            end
-            if add == 3 and modStart then
-                hasMods = true
-                mods[wordsIndex + 1] = part:sub(modStart, modEnd - 1):lower()
-                part = part:sub(modEnd + (modQuote and 2 or 1))
-            end
-        end
-        if inQuote then
-            add = 2
-            if part:sub(-1) == '"' then
-                inQuote = false
-                part = part:sub(1, -2)
-            end
-        end
-        if add == 1 then
-            wordsIndex = wordsIndex + 1
-            words[wordsIndex] = part
-        else
-            tempIndex = tempIndex + 1
-            temp[tempIndex] = part
-            if not inQuote then
-                temp[tempIndex + 1] = nil
-                wordsIndex = wordsIndex + 1
-                words[wordsIndex] = table.concat(temp, " ")
-                tempIndex = 0
-            end
-        end
-    end
-    if tempIndex > 0 then
-        temp[tempIndex + 1] = nil
+        local part = parts[i]
+        local modPart, modPartTemp = part:match(CompactVendorSearchModTypePattern)
         wordsIndex = wordsIndex + 1
-        words[wordsIndex] = table.concat(temp, " ")
+        words[wordsIndex] = part
+        if modPart then
+            hasMods = true
+            mods[wordsIndex] = modPart
+            if modPartTemp:len() > 0 then
+                words[wordsIndex] = modPartTemp
+            else
+                wordsIndex = wordsIndex - 1
+            end
+        else
+            words[wordsIndex] = part
+        end
     end
     if hasMods then
         return words, mods
@@ -120,7 +135,7 @@ local function SplitQuery(query)
 end
 
 ---@param str1 string|number
----@param str2 (string|number)?
+---@param str2? string|number
 ---@return boolean? isExact
 local function IsExact(str1, str2)
     if not str2 then
@@ -130,7 +145,7 @@ local function IsExact(str1, str2)
 end
 
 ---@param str1 string
----@param str2 string?
+---@param str2? string
 ---@return boolean? isPartial
 local function IsPartial(str1, str2)
     if not str2 then
@@ -143,16 +158,16 @@ local function IsPartial(str1, str2)
     return pos >= 1
 end
 
----@param mod CompactVendorSearchModType|nil
----@param part string|nil
----@param value any|nil
+---@param mod? CompactVendorSearchModType
+---@param part? string
+---@param value? any
 ---@return boolean? hasMod
 local function HasMod(mod, part, value)
     if not part or not mod or not value then
         return
     end
     ---@type boolean, CompactVendorSearchModOperator, string
-    local negate, operator, criteria = part:match("^([!]?)([<>~=]*)(.*)$")
+    local negate, operator, criteria = part:match(CompactVendorSearchModOperatorPattern)
     negate = negate == "!"
     if not operator or operator == "" then
         operator = "="
@@ -169,7 +184,7 @@ local function HasMod(mod, part, value)
         if safeCriteria == "" then
             return
         end
-    elseif mod == "i" or mod == "q" or mod == "x" then
+    elseif mod == "i" or mod == "l" or mod == "q" or mod == "x" then
         safeValue = type(value) == "number" and value or tonumber(value) ---@type number?
         if not safeValue then
             return
@@ -267,12 +282,12 @@ function ns.Search.Matches(item, query)
         end
     end
     ---@type string?, _, number, number?, number?, _, _, _, _, _, _, _, _, number?, number?
-    local name, _, quality, ilvl, milvl, _, _, _, _, _, _, _, _, bind, expansion = GetItemInfo(item)
-    if ilvl and ilvl <= 1 then ilvl = nil end
-    if milvl and milvl <= 1 then milvl = nil end
+    local name, _, quality, ilvl, plvl, _, _, _, _, _, _, _, _, bind, expansion = GetItemInfo(item)
     if not name then
         return
     end
+    ilvl = not ilvl or ilvl < 0 and 0 or ilvl
+    plvl = not plvl or plvl < 0 and 0 or plvl
     local qualityName = quality and _G[format("ITEM_QUALITY%d_DESC", quality)] ---@type string?
     local bindName = bind and ns.Search.BindType[bind] ---@type string?
     local expansionName = expansion and _G[format("EXPANSION_NAME%d", expansion)] ---@type string?
@@ -282,7 +297,7 @@ function ns.Search.Matches(item, query)
         if IsExact(part, name) then return true end
         if mod then
             if IsExact(part, ilvl) then return true end
-            if IsExact(part, milvl) then return true end
+            if IsExact(part, plvl) then return true end
             if IsExact(part, qualityName) then return true end
             if IsExact(part, bindName) then return true end
             if IsExact(part, expansionName) then return true end
@@ -291,7 +306,8 @@ function ns.Search.Matches(item, query)
             if HasMod(mod, part, name) then return true end
         elseif mod == "i" then
             if HasMod(mod, part, ilvl) then return true end
-            if HasMod(mod, part, milvl) then return true end
+        elseif mod == "l" then
+            if HasMod(mod, part, plvl) then return true end
         elseif mod == "q" then
             if HasMod(mod, part, quality) then return true end
         elseif mod == "b" then
@@ -302,7 +318,7 @@ function ns.Search.Matches(item, query)
     end
     local nameLC = name:lower()
     local sIlvl = ilvl and tostring(ilvl)
-    local sMIlvl = milvl and tostring(milvl)
+    local sMIlvl = plvl and tostring(plvl)
     local qualityNameLC = qualityName and qualityName:lower()
     local bindNameLC = bindName and bindName:lower()
     local expansionNameLC = expansionName and expansionName:lower()
@@ -322,6 +338,7 @@ function ns.Search.Matches(item, query)
             if HasMod(mod, part, nameLC) then return true end
         elseif mod == "i" then
             if HasMod(mod, part, sIlvl) then return true end
+        elseif mod == "l" then
             if HasMod(mod, part, sMIlvl) then return true end
         elseif mod == "q" then
             if HasMod(mod, part, qualityNameLC) then return true end
