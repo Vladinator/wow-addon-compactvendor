@@ -1098,6 +1098,7 @@ local IsTooltipTextPending do
 
 end
 
+--[[ TODO: not stable on classic clients right now (commenting out this block will disable tooltip scanning behavior - unless `C_TooltipInfo` exists in the global environment)
 local C_TooltipInfo do
 
     C_TooltipInfo = _G.C_TooltipInfo
@@ -1120,14 +1121,20 @@ local C_TooltipInfo do
     if createBackup then
 
         local tooltip = CreateFrame("GameTooltip", "CompactVendorBackupTooltipScanner", UIParent, "GameTooltipTemplate")
-        tooltip:SetOwner(UIParent, "ANCHOR_NONE")
+        tooltip:Hide()
 
         ---@class BackupTooltipScanner
         BackupTooltipScanner = {}
 
         ---@param hyperlink string
         function BackupTooltipScanner:SetHyperlink(hyperlink)
+            tooltip:SetOwner(UIParent, "ANCHOR_NONE")
             tooltip:SetHyperlink(hyperlink)
+            tooltip:Show()
+        end
+
+        function BackupTooltipScanner:ClearHyperlink()
+            tooltip:Hide()
         end
 
         ---@return TooltipDataLine[]
@@ -1163,6 +1170,7 @@ local C_TooltipInfo do
                 lines = self:GetLines(),
                 dataInstanceID = 0,
             }
+            self:ClearHyperlink()
             return tooltipData
         end
 
@@ -1195,6 +1203,7 @@ local C_TooltipInfo do
     end
 
 end
+--]]
 
 local GetSanitizedHyperlinkForItemQuery
 local TooltipScannerState
@@ -1328,13 +1337,18 @@ local TooltipScanner do
 			return false
 		end
 		if not info.tooltipData then
-			if not info.getterName then
+            local getterName = info.getterName
+			if not getterName then
 				return false
 			end
+            local func = type(C_TooltipInfo) == "table" and C_TooltipInfo[getterName] or nil ---@type (fun(...): TooltipData?)?
+            if not func then
+                return false
+            end
 			if info.getterArgs then
-				info.tooltipData = C_TooltipInfo[info.getterName](unpack(info.getterArgs))
+				info.tooltipData = func(unpack(info.getterArgs))
 			else
-				info.tooltipData = C_TooltipInfo[info.getterName]()
+				info.tooltipData = func()
 			end
 		end
 		local tooltipData = info.tooltipData
@@ -1604,6 +1618,16 @@ local TooltipScanner do
     -- TODO: "merchant" seem to return results too early (the tooltip loads, but additional merchant requirements do not load in time) so using the hyperlink approach for now (there is also the issue of localization when using merchant tooltips...)
     ---@type "hyperlink"|"merchant"
     TooltipScanner.UseTooltipType = "hyperlink"
+
+    function TooltipScanner:IsSupported()
+        if type(C_TooltipInfo) ~= "table" then
+            return false
+        end
+        if TooltipScanner.UseTooltipType == "merchant" then
+            return type(C_TooltipInfo.GetMerchantItem) == "function"
+        end
+        return type(C_TooltipInfo.GetHyperlink) == "function"
+    end
 
     function TooltipScanner:ClearCache()
         TooltipScanPool:ClearCache()
@@ -1975,6 +1999,9 @@ local RefreshAndUpdateMerchantItemButton do
             self.tooltipScannable = false
         end
         if not self.tooltipScannable then
+            return
+        end
+        if not TooltipScanner:IsSupported() then
             return
         end
         TooltipScanner:ScanMerchantItem(self)
@@ -2430,28 +2457,26 @@ local MerchantScanner do
     ---@type MerchantItemFramePool
     MerchantScanner.buttonPool = CreateFramePool("Button", nil, "CompactVendorFrameMerchantButtonTemplate") ---@diagnostic disable-line: assign-type-mismatch
 
-    ---@return boolean merchantExists, boolean sameMerchant
+    ---@return boolean merchantExists
     function MerchantScanner:UpdateMerchantInfo()
         if not self.merchantOpen then
             self.guid = nil
             self.name = nil
             self.isReady = false
             self:TriggerEvent(self.Event.OnHide)
-            return false, false
+            return false
         end
-        local guid = self.guid
         self.guid = UnitGUID("npc")
         self.name = UnitName("npc")
         local merchantExists = not not self.guid
-        local sameMerchant = self.guid == guid
-        if merchantExists and not sameMerchant then
+        if merchantExists then
             self.isReady = false
             self:TriggerEvent(self.Event.OnShow)
-        elseif not merchantExists then
+        else
             self.isReady = false
             self:TriggerEvent(self.Event.OnHide)
         end
-        return merchantExists, sameMerchant
+        return merchantExists
     end
 
     ---@return string guid, string name
@@ -2749,7 +2774,7 @@ local MerchantDataProvider do
         "OnPreUpdate",
         "OnUpdate",
         "OnPostUpdate",
-        "OnReady",
+        -- "OnReady",
     })
 
     MerchantDataProvider.filters = {}
@@ -2788,13 +2813,17 @@ local MerchantDataProvider do
         return filteredItems, allDisplayed
     end
 
+    function MerchantDataProvider:IsReady()
+        return MerchantScanner.isReady
+    end
+
     function MerchantDataProvider:GetMerchantItems()
         return MerchantScanner:GetMerchantItems()
     end
 
     function MerchantDataProvider:Refresh()
-        local isReady = MerchantScanner.isReady
-        local items = MerchantDataProvider:GetMerchantItems()
+        local isReady = self:IsReady()
+        local items = self:GetMerchantItems()
         local filteredItems = self:ApplyFilters(items)
         self:TriggerEvent(self.Event.OnPreUpdate, isReady)
         self:Flush()
@@ -2828,6 +2857,8 @@ local MerchantDataProvider do
     MerchantScanner:RegisterCallback(MerchantScanner.Event.OnHide, OnHide)
     MerchantScanner:RegisterCallback(MerchantScanner.Event.OnUpdate, OnUpdate)
     MerchantScanner:RegisterCallback(MerchantScanner.Event.OnReady, OnReady)
+
+    -- hooksecurefunc("MerchantFrame_UpdateMerchantInfo", function() MerchantDataProvider:Refresh() end)
 
 end
 
@@ -3191,24 +3222,14 @@ local Frame do
 
         local scrollPercentage
 
-        local function hasNoItems()
-            local merchantItems = MerchantDataProvider:GetMerchantItems()
-            if #merchantItems == 0 then
-                return true
-            end
-            local visibleItems = MerchantDataProvider:GetSize()
-            return visibleItems == 0
-        end
-
-        ---@param isReady? boolean
-        local function updateLoading(isReady)
-            if not isReady then
+        local function updateLoading()
+            if not MerchantDataProvider:IsReady() then
                 self.Loading:Show()
                 self.NoItems:Hide()
                 return
             end
             self.Loading:Hide()
-            self.NoItems:SetShown(hasNoItems())
+            self.NoItems:SetShown(MerchantDataProvider:IsEmpty())
         end
 
         local function OnShow()
@@ -3222,9 +3243,8 @@ local Frame do
             scrollPercentage = self.ScrollBox:CalculateScrollPercentage()
         end
 
-        ---@param isReady boolean
-        local function OnPostUpdate(_, isReady)
-            updateLoading(isReady)
+        local function OnPostUpdate()
+            updateLoading()
             if not scrollPercentage then
                 return
             end
@@ -3235,13 +3255,6 @@ local Frame do
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnShow, OnShow)
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPreUpdate, OnPreUpdate)
         MerchantDataProvider:RegisterCallback(MerchantDataProvider.Event.OnPostUpdate, OnPostUpdate)
-
-        -- TODO: the code below is a bandaid fix that only resolves odd behavior when the frame is shown for the first time
-        -- and the events fire as they should, but once the UI is drawn and ready, the buttons themselves behave like they aren't interractable, but
-        -- the hover animation works, quantity button works, but the icon isn't being updated (OnUpdate might be disabled?) and this is fixed if we
-        -- manually refresh the data provider one more time... but why?
-
-        hooksecurefunc("MerchantFrame_UpdateMerchantInfo", function() C_Timer.After(0.25, function() MerchantDataProvider:Refresh() end) end)
 
     end
 

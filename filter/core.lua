@@ -113,10 +113,6 @@ local CompactVendorFilterFrameTemplate do
             self:RefreshFilters()
             self.Button:Show()
         end
-        local function onReady()
-            canUseFilters()
-            self:Refresh(true)
-        end
         ---@param isReady boolean
         local function onUpdate(_, isReady)
             if isReady then
@@ -127,7 +123,6 @@ local CompactVendorFilterFrameTemplate do
         end
         self.MerchantDataProvider:RegisterCallback(self.MerchantDataProvider.Event.OnShow, onLoading)
         self.MerchantDataProvider:RegisterCallback(self.MerchantDataProvider.Event.OnPostUpdate, onUpdate)
-        self.MerchantDataProvider:RegisterCallback(self.MerchantDataProvider.Event.OnReady, onReady)
     end
 
     ---@param event WowEvent
@@ -194,9 +189,8 @@ local CompactVendorFilterFrameTemplate do
         self:Refresh()
     end
 
-    ---@param forceUpdate? boolean
-    function CompactVendorFilterFrameTemplate:Refresh(forceUpdate)
-        if self.VendorUpdating and not forceUpdate then
+    function CompactVendorFilterFrameTemplate:Refresh()
+        if self.VendorUpdating then
             return
         end
         self.VendorUpdating = true
