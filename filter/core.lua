@@ -105,7 +105,7 @@ local CompactVendorFilterFrameTemplate do
         self.VendorUpdating = false
         UIDropDownMenu_SetInitializeFunction(self, self.DropdownInitialize)
         local function onLoading()
-            self:RefreshFilters(true)
+            -- self:RefreshFilters(true)
             self.Button:Hide()
             CloseDropDownMenus()
         end
