@@ -4552,12 +4552,18 @@ local CompactVendorFrameMerchantButtonTemplate do
             self.name = merchantItem.name
             self.texture = merchantItem.texture
             MerchantFrame_ConfirmExtendedItemCost(self, quantity)
-            if self.showNonrefundablePrompt then
-                local _, frame = StaticPopup_Visible("CONFIRM_PURCHASE_NONREFUNDABLE_ITEM")
-                if frame then
-                    local textString = frame.text:GetText()
-                    frame.text:SetFormattedText("%s\r\n%s", textString, "|cffFF0000Your purchase is not refundable.|r")
-                end
+            if not self.showNonrefundablePrompt then
+                return
+            end
+            local _, frame = StaticPopup_Visible("CONFIRM_PURCHASE_NONREFUNDABLE_ITEM")
+            if not frame then
+                return
+            end
+            local textFontString = frame.text or frame.Text or frame:GetTextFontString() or nil ---@type FontString
+            local text = textFontString:GetText()
+            local warningText = "|cffFF0000Your purchase is not refundable.|r"
+            if not text:find(warningText, nil, true) then
+                textFontString:SetFormattedText("%s\r\n%s", text, warningText)
             end
             return
         end
