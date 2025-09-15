@@ -216,19 +216,27 @@ local function HasMod(mod, part, value)
     return has
 end
 
----@param item? string|number
----@param query? string
+---@param hyperlinkOrID string|number
+---@return "item"|"currency"|"spell"? itemType
+local function GetLinkType(hyperlinkOrID)
+    ---@type HyperlinkType?
+    local itemType
+    if type(hyperlinkOrID) == "number" or hyperlinkOrID:find("|Hitem:", nil, true) then
+        itemType = "item"
+    elseif hyperlinkOrID:find("|Hcurrency:", nil, true) then
+        itemType = "currency"
+    elseif hyperlinkOrID:find("|Hspell:", nil, true) then
+        itemType = "spell"
+    end
+    return itemType
+end
+
+---@param itemLinkOrID string|number
+---@param query string
 ---@return boolean? matched
-function ns.Search.Matches(item, query)
-    if not item or not query then
-        return
-    end
-    query = query:trim()
-    if query == "" then
-        return
-    end
+local function MatchesItem(itemLinkOrID, query)
     local parts, mods = SplitQuery(query)
-    local itemID, itemType, itemSubType, itemEquipLoc, _, classID, subClassID = GetItemInfoInstant(item)
+    local itemID, itemType, itemSubType, itemEquipLoc, _, classID, subClassID = GetItemInfoInstant(itemLinkOrID)
     if itemEquipLoc and itemEquipLoc ~= "" then
         itemEquipLoc = _G[itemEquipLoc]
     end
@@ -282,7 +290,7 @@ function ns.Search.Matches(item, query)
         end
     end
     ---@type string?, _, number, number?, number?, _, _, _, _, _, _, _, _, number?, number?
-    local name, _, quality, ilvl, plvl, _, _, _, _, _, _, _, _, bind, expansion = GetItemInfo(item)
+    local name, _, quality, ilvl, plvl, _, _, _, _, _, _, _, _, bind, expansion = GetItemInfo(itemLinkOrID)
     if not name then
         return
     end
@@ -349,4 +357,81 @@ function ns.Search.Matches(item, query)
         end
     end
     return false
+end
+
+---@param currencyLinkOrID string|number
+---@param query string
+---@return boolean? matched
+local function MatchesCurrency(currencyLinkOrID, query)
+    if not C_CurrencyInfo then
+        return
+    end
+    local func = type(currencyLinkOrID) == "number" and C_CurrencyInfo.GetCurrencyInfo or C_CurrencyInfo.GetCurrencyInfoFromLink
+    if not func then
+        return
+    end
+    local info = func(currencyLinkOrID)
+    if not info then
+        return
+    end
+    local parts, mods = SplitQuery(query)
+    local name = info.name
+    for i = 1, #parts do
+        local part = parts[i]
+        if IsExact(part, name) then return true end
+    end
+    local nameLC = name:lower()
+    for i = 1, #parts do
+        local part = parts[i]
+        local partLC = part:lower()
+        if IsPartial(partLC, nameLC) then return true end
+    end
+end
+
+---@param spellLinkOrID string|number
+---@param query string
+---@return boolean? matched
+local function MatchesSpell(spellLinkOrID, query)
+    if not C_Spell or not C_Spell.GetSpellInfo then
+        return
+    end
+    local info = C_Spell.GetSpellInfo(spellLinkOrID)
+    if not info then
+        return
+    end
+    local parts, mods = SplitQuery(query)
+    local name = info.name
+    for i = 1, #parts do
+        local part = parts[i]
+        if IsExact(part, name) then return true end
+    end
+    local nameLC = name:lower()
+    for i = 1, #parts do
+        local part = parts[i]
+        local partLC = part:lower()
+        if IsPartial(partLC, nameLC) then return true end
+    end
+end
+
+---@param hyperlinkOrID? string|number
+---@param query? string
+---@return boolean? matched
+function ns.Search.Matches(hyperlinkOrID, query)
+    if not hyperlinkOrID or not query then
+        return
+    end
+    query = query:trim()
+    if query == "" then
+        return
+    end
+    local linkType = GetLinkType(hyperlinkOrID)
+    if not linkType then
+        return
+    elseif linkType == "item" then
+        return MatchesItem(hyperlinkOrID, query)
+    elseif linkType == "currency" then
+        return MatchesCurrency(hyperlinkOrID, query)
+    elseif linkType == "spell" then
+        return MatchesSpell(hyperlinkOrID, query)
+    end
 end

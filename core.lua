@@ -4559,7 +4559,7 @@ local CompactVendorFrameMerchantButtonTemplate do
             if not frame then
                 return
             end
-            local textFontString = frame.text or frame.Text or frame:GetTextFontString() or nil ---@type FontString
+            local textFontString = frame.text or frame.Text or frame:GetTextFontString() ---@type FontString
             local text = textFontString:GetText()
             local warningText = "|cffFF0000Your purchase is not refundable.|r"
             if not text:find(warningText, nil, true) then
