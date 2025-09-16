@@ -1205,7 +1205,7 @@ local C_TooltipInfo do
 end
 --]]
 
-local GetSanitizedHyperlinkForItemQuery
+local GetSanitizedHyperlinkForQuery
 local TooltipScannerState
 local TooltipScannerStateIsPending
 local TooltipScanner do
@@ -1450,13 +1450,13 @@ local TooltipScanner do
 
     ---@param query number|string
     ---@return string hyperlink
-    function TooltipScanPool:GetSanitizedHyperlinkForItemQuery(query)
+    function TooltipScanPool:GetSanitizedHyperlinkForQuery(query)
         if type(query) == "number" then
             return format("|cffffffff|Hitem:%d::::::::::::::::::|h[]|h|r", query)
         end
-        ---@type string, string
-        local id, params = query:match("item:(%d+):(.-)|h")
-        return format("|cffffffff|Hitem:%s:%s|h[]|h|r", id, params)
+        ---@type string, string, string
+        local key, id, params = query:match("|H(%D+):(%d+):(.-)|h")
+        return format("|cffffffff|H%s:%s:%s|h[]|h|r", key, id, params)
     end
 
 	---@param callback fun(tooltipData: TooltipData)
@@ -1595,8 +1595,8 @@ local TooltipScanner do
     end
 
     ---@param hyperlink string
-    function GetSanitizedHyperlinkForItemQuery(hyperlink)
-        return TooltipScanPool:GetSanitizedHyperlinkForItemQuery(hyperlink)
+    function GetSanitizedHyperlinkForQuery(hyperlink)
+        return TooltipScanPool:GetSanitizedHyperlinkForQuery(hyperlink)
     end
 
     ---@enum TooltipScannerState
@@ -1639,7 +1639,7 @@ local TooltipScanner do
             return
         end
         local scanMerchantTooltip = self.UseTooltipType == "merchant"
-        local tooltipScannerID = scanMerchantTooltip and merchantItem.index or GetSanitizedHyperlinkForItemQuery(merchantItem.itemLink)
+        local tooltipScannerID = scanMerchantTooltip and merchantItem.index or GetSanitizedHyperlinkForQuery(merchantItem.itemLink)
         if merchantItem.tooltipScannerID ~= tooltipScannerID then
             merchantItem:ResetTooltipData()
         end
@@ -2655,11 +2655,11 @@ local MerchantScanner do
     ---@param hyperlink string
     ---@return MerchantItem? merchantItem
     function MerchantScanner:GetMerchantItemByItemLink(hyperlink)
-        local sanitizedHyperlink = GetSanitizedHyperlinkForItemQuery(hyperlink)
+        local sanitizedHyperlink = GetSanitizedHyperlinkForQuery(hyperlink)
         for _, itemData in ipairs(self.collection) do
             local itemLink = itemData.itemLink
             if itemLink then
-                local sanitizedItemLink = GetSanitizedHyperlinkForItemQuery(itemLink)
+                local sanitizedItemLink = GetSanitizedHyperlinkForQuery(itemLink)
                 if sanitizedHyperlink == sanitizedItemLink then
                     return itemData
                 end
