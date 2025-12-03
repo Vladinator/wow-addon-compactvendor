@@ -36,8 +36,6 @@ do
     ---@class CompactVendorFilterDropDownLearnableOption : CompactVendorFilterDropDownTemplateOption
     ---@field public value CompactVendorFilterDropDownLearnableOptionValue
 
-    ---@type CompactVendorFilterDropDownLearnableOption[]
-
     ---@param itemData MerchantItem
     ---@return boolean collectable, boolean collected, number current, number total
     local function GetCollectedStatus(itemData)

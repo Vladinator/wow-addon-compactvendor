@@ -37,6 +37,7 @@
 
     <Script file="filters\affordable.lua" />
     <Script file="filters\appearance.lua" />
+    <Script file="filters\decor.lua" />
     <Script file="filters\learnable.lua" />
     <Script file="filters\purchasable.lua" />
     <Script file="filters\quality.lua" />

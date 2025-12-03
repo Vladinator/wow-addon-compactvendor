@@ -668,6 +668,30 @@ local IsCosmeticBundleCollected do
 
 end
 
+local IsDecorCollected do
+
+    ---@param itemQuery string|number
+    ---@return boolean? isDecor, boolean? isCollected, number? numCollected
+    function IsDecorCollected(itemQuery)
+        if type(itemQuery) ~= "string" and type(itemQuery) ~= "number" then
+            return
+        end
+        if not C_Item.IsDecorItem or not C_HousingCatalog.GetCatalogEntryInfoByItem then
+            return
+        end
+        if not C_Item.IsDecorItem(itemQuery) then
+            return false
+        end
+        local info = C_HousingCatalog.GetCatalogEntryInfoByItem(itemQuery, true)
+        if not info then
+            return true
+        end
+        local numCollected = info.numPlaced + info.numStored
+        return true, numCollected > 0, numCollected
+    end
+
+end
+
 local CreateTooltipItem
 local IsTooltipTextPending do
 
@@ -1979,6 +2003,9 @@ local RefreshAndUpdateMerchantItemButton do
         self.itemClassID,
         self.itemSubClassID = GetItemInfoInstant(self.itemLinkOrID)
         self.maxStackCount = select(8, GetItemInfo(self.itemLinkOrID))
+        self.isDecor,
+        self.isDecorCollected,
+        self.isDecorCollectedNum = IsDecorCollected(self.itemLinkOrID)
         self.isTransmog = CanTransmogItem(self.itemLinkOrID)
         self.isTransmogCollectable,
         self.isTransmogCollected = IsTransmogCollected(self.itemLink)
@@ -3427,6 +3454,7 @@ local Frame do
     end
 
     Frame:OnLoad()
+    ns.Frame = Frame
 
 end
 
