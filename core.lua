@@ -523,7 +523,7 @@ local IsTransmogCollected do
         if itemEquipLoc and ignoreEquipLoc[itemEquipLoc] then
             return
         end
-        if not C_Transmog.CanTransmogItem(itemLinkOrID) then
+        if C_Transmog.CanTransmogItem and not C_Transmog.CanTransmogItem(itemLinkOrID) then
             return false
         end
         return true
