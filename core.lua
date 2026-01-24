@@ -687,8 +687,8 @@ local IsDecorCollected do
             return true
         end
         local numPlaced = info.numPlaced or 0
-        local numStored = info.numStored or 0
-        local numCollected = numPlaced + numStored
+        local numQuantity = (info.quantity or 0) + (info.numStored or 0)
+        local numCollected = numPlaced + numQuantity
         return true, numCollected > 0, numCollected
     end
 

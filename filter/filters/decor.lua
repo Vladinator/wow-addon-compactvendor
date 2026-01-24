@@ -22,6 +22,14 @@ if C_HousingCatalog_CreateCatalogSearcher then
         provider:RegisterCallback(provider.Event.OnUpdate, UpdateCatalog)
     end)
 
+    ns.Frame:RegisterEvent("HOUSING_STORAGE_ENTRY_UPDATED")
+    ns.Frame:HookScript("OnEvent", function(_, event)
+        if event == "HOUSING_STORAGE_ENTRY_UPDATED" then
+            local provider = ns.Frame.ScrollBox:GetDataProvider()
+            provider:Refresh()
+        end
+    end)
+
 end
 
 do
