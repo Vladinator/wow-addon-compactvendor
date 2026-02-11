@@ -704,18 +704,34 @@ local IsTooltipTextPending do
     local TooltipDataLineType = Enum.TooltipDataLineType
 
     ---@type table<TooltipDataLineType, true?>
-    local TooltipDataLineTypeIsTextMap = {
-        [TooltipDataLineType.None] = true,
-        [TooltipDataLineType.RestrictedRaceClass] = true,
-        [TooltipDataLineType.RestrictedFaction] = true,
-        [TooltipDataLineType.RestrictedSkill] = true,
-        [TooltipDataLineType.RestrictedPvPMedal] = true,
-        [TooltipDataLineType.RestrictedReputation] = true,
-        [TooltipDataLineType.RestrictedSpellKnown] = true,
-        [TooltipDataLineType.RestrictedLevel] = true,
-        -- [TooltipDataLineType.RestrictedArena] = true,
-        -- [TooltipDataLineType.RestrictedBg] = true,
-    }
+    local TooltipDataLineTypeIsTextMap = {}
+
+    local function appendLineTypes(...)
+        for _, value in pairs({...}) do
+            if value then
+                TooltipDataLineTypeIsTextMap[value] = true
+            end
+        end
+    end
+
+    appendLineTypes(TooltipDataLineType.None)
+
+    appendLineTypes(
+        TooltipDataLineType.ErrorLine,
+        TooltipDataLineType.UsageRequirement
+    )
+
+    appendLineTypes(
+        TooltipDataLineType.RestrictedRaceClass,
+        TooltipDataLineType.RestrictedFaction,
+        TooltipDataLineType.RestrictedSkill,
+        TooltipDataLineType.RestrictedPvPMedal,
+        TooltipDataLineType.RestrictedReputation,
+        TooltipDataLineType.RestrictedSpellKnown,
+        TooltipDataLineType.RestrictedLevel
+        -- TooltipDataLineType.RestrictedArena,
+        -- TooltipDataLineType.RestrictedBg,
+    )
 
     ---@class TooltipItem
     ---@field public tooltipData TooltipDataArgs
