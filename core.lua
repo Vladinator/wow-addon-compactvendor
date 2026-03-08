@@ -36,6 +36,8 @@ local MerchantNextPageButton = MerchantNextPageButton ---@type Button
 local MerchantPageText = MerchantPageText ---@type FontString
 local MerchantPrevPageButton = MerchantPrevPageButton ---@type Button
 
+local issecretvalue = issecretvalue or function() end
+
 local addonName, ---@type string CompactVendor
     ns = ... ---@class CompactVendorNS
 
@@ -386,7 +388,7 @@ local ConvertToPattern do
     ---@param guid? string
     ---@return string? npcType, number? npcID
     function GetInfoFromGUID(guid)
-        if type(guid) ~= "string" then
+        if type(guid) ~= "string" or issecretvalue(guid) then
             return
         end
         local npcType, _, _, _, _, npcID = strsplit("-", guid)
