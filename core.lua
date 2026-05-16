@@ -550,7 +550,8 @@ local IsTransmogCollected do
             local isCollected = C_TransmogCollection.PlayerHasTransmogByItemInfo(itemLink)
             return true, isCollected
         end
-        local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
+        local sourceInfo = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
+        local isCollected = sourceInfo.isCollected
         return true, isCollected
     end
 
@@ -651,7 +652,8 @@ local IsCosmeticBundleCollected do
             local setItem = setItems[i]
             local itemModifiedAppearanceID = setItem.itemModifiedAppearanceID
             local invSlot = setItem.invSlot
-            local _, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(itemModifiedAppearanceID)
+            local sourceInfo = C_TransmogCollection.GetAppearanceSourceInfo(itemModifiedAppearanceID)
+            local isCollected = sourceInfo.isCollected
             slotCollected[invSlot] = slotCollected[invSlot] or isCollected
             if isCollected then
                 totalCollected = totalCollected + 1
@@ -665,11 +667,12 @@ local IsCosmeticBundleCollected do
                 numCollected = numCollected + 1
             end
         end
-        return true, numAvailable == numCollected, totalCollected, totalAvailable
+        local isCollected = numAvailable > 0 and numAvailable == numCollected
+        return true, isCollected, totalCollected, totalAvailable
     end
 
 end
-
+_G.IsCosmeticBundleCollected = IsCosmeticBundleCollected -- DEBUG -- /dump IsCosmeticBundleCollected("")
 local IsDecorCollected do
 
     ---@param itemQuery string|number

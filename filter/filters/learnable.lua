@@ -82,7 +82,7 @@ do
                 value = 2
                 text = PROFESSIONS_COLUMN_REAGENTS_PARTIAL
             end
-        elseif current < total then
+        elseif current > 0 and current < total then
             value = 2
             text = PROFESSIONS_COLUMN_REAGENTS_PARTIAL
         else
