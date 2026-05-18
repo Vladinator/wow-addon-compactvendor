@@ -550,8 +550,10 @@ local IsTransmogCollected do
             local isCollected = C_TransmogCollection.PlayerHasTransmogByItemInfo(itemLink)
             return true, isCollected
         end
-        local sourceInfo = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
-        local isCollected = sourceInfo.isCollected
+        local sourceInfo, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(sourceID)
+        if type(sourceInfo) == "table" then
+            isCollected = sourceInfo.isCollected
+        end
         return true, isCollected
     end
 
@@ -652,8 +654,10 @@ local IsCosmeticBundleCollected do
             local setItem = setItems[i]
             local itemModifiedAppearanceID = setItem.itemModifiedAppearanceID
             local invSlot = setItem.invSlot
-            local sourceInfo = C_TransmogCollection.GetAppearanceSourceInfo(itemModifiedAppearanceID)
-            local isCollected = sourceInfo.isCollected
+            local sourceInfo, _, _, _, isCollected = C_TransmogCollection.GetAppearanceSourceInfo(itemModifiedAppearanceID)
+            if type(sourceInfo) == "table" then
+                isCollected = sourceInfo.isCollected
+            end
             slotCollected[invSlot] = slotCollected[invSlot] or isCollected
             if isCollected then
                 totalCollected = totalCollected + 1
