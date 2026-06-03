@@ -676,7 +676,7 @@ local IsCosmeticBundleCollected do
     end
 
 end
-_G.IsCosmeticBundleCollected = IsCosmeticBundleCollected -- DEBUG -- /dump IsCosmeticBundleCollected("")
+
 local IsDecorCollected do
 
     ---@param itemQuery string|number

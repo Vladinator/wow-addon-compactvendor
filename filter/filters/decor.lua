@@ -1,9 +1,9 @@
 local CompactVendorFilterDropDownToggleWrapperTemplate = CompactVendorFilterDropDownToggleWrapperTemplate ---@type CompactVendorFilterDropDownToggleWrapperTemplate
 local ns = select(2, ...) ---@type CompactVendorNS
-local C_HousingCatalog_CreateCatalogSearcher = C_HousingCatalog and C_HousingCatalog.CreateCatalogSearcher ---@type (fun())?
 
 -- HOTFIX: until the `C_HousingCatalog.GetCatalogEntryInfoByItem` API gets properly fixed this helps mitigate the issue somewhat
-if C_HousingCatalog_CreateCatalogSearcher then
+local C_HousingCatalog_CreateCatalogSearcher = C_HousingCatalog and C_HousingCatalog.CreateCatalogSearcher ---@type (fun())?
+if C_HousingCatalog_CreateCatalogSearcher and WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
 
     local previous
 
