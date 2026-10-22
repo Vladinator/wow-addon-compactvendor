@@ -20,7 +20,7 @@ local GetMerchantItemInfo = GetMerchantItemInfo or C_MerchantFrame.GetItemInfo -
 local HandleModifiedItemClick = HandleModifiedItemClick ---@type fun(itemLink: string): boolean
 local IsCosmeticItem = IsCosmeticItem or C_Item.IsCosmeticItem ---@type fun(item: string|number): boolean
 local IsDressableItemByID = IsDressableItem or C_Item.IsDressableItemByID ---@type fun(item: string|number): boolean
-local MerchantFrame_ConfirmExtendedItemCost = MerchantFrame_ConfirmExtendedItemCost ---@type fun(self: Region, quantity: number)
+local MerchantFrame_ConfirmExtendedItemCost = MerchantFrame_ConfirmExtendedItemCost ---@type fun(self: CompactVendorFrameMerchantButtonTemplate_MerchantFrame_ConfirmExtendedItemCost, quantity: number)
 local PlayerHasToy = PlayerHasToy ---@type fun(item: string|number): boolean
 local SearchBoxTemplate_OnLoad = SearchBoxTemplate_OnLoad ---@type fun(self: EditBox)
 local SearchBoxTemplate_OnTextChanged = SearchBoxTemplate_OnTextChanged ---@type fun(self: EditBox)
@@ -170,7 +170,7 @@ local ConvertToPattern do
     ---@field public name string
 
     ItemQualityColorToHexColor = {} ---@type table<number, SimpleColor>
-    ItemHexColorToQualityIndex = {} ---@type table<string, number>
+    ItemHexColorToQualityIndex = {} ---@type table<number|string, number|SimpleColor>
     ColorPreset = {} ---@type table<string|number, SimpleColor>
 
     local HardcodedQualityColors = {
@@ -221,6 +221,7 @@ local ConvertToPattern do
     ---@param g number?
     ---@param b number?
     ---@return SimpleColor? color
+    ---@overload fun(key: string, hex: string, r: number, g: number, b: number): color: SimpleColor
     local function AppendColor(key, hex, r, g, b)
 
         local color ---@type SimpleColor?
@@ -237,9 +238,9 @@ local ConvertToPattern do
         elseif type(hex) == "string" then
 
             color = {
-                r = r, ---@diagnostic disable-line: assign-type-mismatch
-                g = g, ---@diagnostic disable-line: assign-type-mismatch
-                b = b, ---@diagnostic disable-line: assign-type-mismatch
+                r = r,
+                g = g,
+                b = b,
                 hex = hex,
                 name = key,
             }
@@ -258,9 +259,11 @@ local ConvertToPattern do
                 g = g/255
                 b = b/255
 
-                color.r = r
-                color.g = g
-                color.b = b
+                if color then
+                    color.r = r
+                    color.g = g
+                    color.b = b
+                end
 
             end
 
@@ -272,7 +275,7 @@ local ConvertToPattern do
 
         local index = #ItemQualityColorToHexColor + 1
         ItemQualityColorToHexColor[index] = color
-        ItemHexColorToQualityIndex[key] = color ---@diagnostic disable-line: assign-type-mismatch
+        ItemHexColorToQualityIndex[key] = color
         ItemHexColorToQualityIndex[color.hex] = index
         ColorPreset[key] = color
         ColorPreset[index] = color
@@ -506,8 +509,8 @@ local IsTransmogCollected do
         INVTYPE_RELIC = true,
     }
 
-    ---@alias CompactVendorCanTransmogItem fun(itemLinkOrID: string|number): canTransmog: boolean?
-    ---@alias CompactVendorIsTransmogCollected fun(itemLink: string): canCollect: boolean?, isCollected: boolean?
+    ---@alias CompactVendorCanTransmogItem fun(itemLinkOrID?: string|number): canTransmog: boolean?
+    ---@alias CompactVendorIsTransmogCollected fun(itemLink?: string): canCollect: boolean?, isCollected: boolean?
 
     ---@type CompactVendorCanTransmogItem
     local function DefaultCanTransmogItem(itemLinkOrID)
@@ -621,7 +624,7 @@ end
 
 local IsCosmeticBundleCollected do
 
-    ---@param itemLink string
+    ---@param itemLink? string
     ---@return boolean? canCollect, boolean? isCollected, number? numCollectedItems, number? numTotalItems
     function IsCosmeticBundleCollected(itemLink)
         if type(itemLink) ~= "string" then
@@ -696,7 +699,7 @@ local IsDecorCollected do
             return true
         end
         local numPlaced = info.numPlaced or 0
-        local numQuantity = (info.quantity or 0) + (info.numStored or 0)
+        local numQuantity = (info.quantity or 0) + (info.numStored or 0) ---@diagnostic expect-line: undefined-field
         local numCollected = numPlaced + numQuantity
         return true, numCollected > 0, numCollected
     end
@@ -731,15 +734,15 @@ local IsTooltipTextPending do
     )
 
     appendLineTypes(
-        TooltipDataLineType.RestrictedRaceClass,
-        TooltipDataLineType.RestrictedFaction,
-        TooltipDataLineType.RestrictedSkill,
-        TooltipDataLineType.RestrictedPvPMedal,
-        TooltipDataLineType.RestrictedReputation,
-        TooltipDataLineType.RestrictedSpellKnown,
-        TooltipDataLineType.RestrictedLevel
-        -- TooltipDataLineType.RestrictedArena,
-        -- TooltipDataLineType.RestrictedBg,
+        TooltipDataLineType.RestrictedRaceClass, ---@diagnostic expect-line: undefined-field
+        TooltipDataLineType.RestrictedFaction, ---@diagnostic expect-line: undefined-field
+        TooltipDataLineType.RestrictedSkill, ---@diagnostic expect-line: undefined-field
+        TooltipDataLineType.RestrictedPvPMedal, ---@diagnostic expect-line: undefined-field
+        TooltipDataLineType.RestrictedReputation, ---@diagnostic expect-line: undefined-field
+        TooltipDataLineType.RestrictedSpellKnown, ---@diagnostic expect-line: undefined-field
+        TooltipDataLineType.RestrictedLevel ---@diagnostic expect-line: undefined-field
+        -- TooltipDataLineType.RestrictedArena, ---@diagnostic expect-line: undefined-field
+        -- TooltipDataLineType.RestrictedBg, ---@diagnostic expect-line: undefined-field
     )
 
     ---@class TooltipItem
@@ -845,7 +848,7 @@ local IsTooltipTextPending do
     local TooltipItem = {}
 
     ---@param tooltipData TooltipData
-    ---@param hyperlinkOrIndex string|number
+    ---@param hyperlinkOrIndex? string|number
     ---@param optionalArg1? number
     ---@param optionalArg2? number
     ---@param hideVendorPrice? boolean
@@ -1136,7 +1139,7 @@ local IsTooltipTextPending do
     end
 
     ---@param tooltipData TooltipData
-    ---@param hyperlinkOrIndex string|number
+    ---@param hyperlinkOrIndex? string|number
     ---@param optionalArg1? number
     ---@param optionalArg2? number
     ---@param hideVendorPrice? boolean
@@ -1413,7 +1416,7 @@ local TooltipScanner do
 		end
 		self.infoList[#self.infoList + 1] = info
 		self.processingInfo = info
-		if self.processingInfo.tooltipPostCall then
+		if self.processingInfo and self.processingInfo.tooltipPostCall then
 			self.processingInfo.tooltipPostCall(self)
 		end
 		return true
@@ -1474,6 +1477,7 @@ local TooltipScanner do
 	---@field public SetResetDisallowedIfNew fun(self, state: boolean)
 
 	---@type fun(creationFunc: (fun(pool: TooltipScanPoolMixin): TooltipScanObjectMixin), resetterFunc?: fun(pool: TooltipScanPoolMixin, object: TooltipScanObjectMixin)): TooltipScanPoolMixin
+    ---@diagnostic expect-next-line: assign-type-mismatch
 	local CreateTooltipPool = CreateObjectPool
 
 	---@class TooltipScanPool : TooltipScanPoolMixin
@@ -1645,9 +1649,9 @@ local TooltipScanner do
         )
     end
 
-    ---@param hyperlink string
+    ---@param hyperlink? string
     function GetSanitizedHyperlinkForQuery(hyperlink)
-        return TooltipScanPool:GetSanitizedHyperlinkForQuery(hyperlink)
+        return TooltipScanPool:GetSanitizedHyperlinkForQuery(hyperlink or "")
     end
 
     ---@enum TooltipScannerState
@@ -2191,7 +2195,7 @@ local RefreshAndUpdateMerchantItemButton do
             if costItem.name then
                 return true
             end
-            if costItem.itemLink and costItem.quality < Enum.ItemQuality.Uncommon then
+            if costItem.itemLink and costItem.quality and costItem.quality < Enum.ItemQuality.Uncommon then
                 return false
             end
         end
@@ -2362,7 +2366,9 @@ local RefreshAndUpdateMerchantItemButton do
     ---@return CompactVendorFrameMerchantButtonTemplate merchantButton
     function CreateMerchantItemButton(button, merchantItem)
         button.merchantItem = merchantItem
-        merchantItem.parentButton = button
+        if merchantItem then
+            merchantItem.parentButton = button
+        end
         RefreshAndUpdateMerchantItemButton(button)
         return button
     end
@@ -2427,6 +2433,7 @@ local MerchantScanner do
     ---@class MerchantScanner
     ---@field public Event table<MerchantScannerEvent, number>
     ---@field public collection DataProviderItemData[]
+    ---@diagnostic expect-next-line: incompatible-override
     ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: MerchantScannerEvent[])
 
     ---@class MerchantScanner : Frame, CallbackRegistry
@@ -3072,7 +3079,7 @@ local Frame do
         ---@alias ViewScrollBoxElementData MerchantItem
         ---@alias ViewPolyfillLayoutFunction fun(index: number, frame: ViewScrollBoxFrame, offset: number, scrollTarget: ViewScrollBoxScrollTarget): any
         ---@alias ViewPolyfillElementInitializerFunction fun(self: ViewScrollBoxElement, elementData: ViewScrollBoxElementData)
-        ---@alias ViewPolyfillElementResetterFunction fun(self: ViewScrollBoxElement, elementData: ViewScrollBoxElementData)
+        ---@alias ViewPolyfillElementResetterFunction fun(pool: any, element: ViewScrollBoxElement, isNew: boolean)
         ---@alias ViewPolyfillElementFactoryFunction fun(factory: fun(), elementData: ViewScrollBoxElementData)
 
         ---@class ViewPolyfill
@@ -3564,7 +3571,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
         end
     end
 
-    ---@param text number
+    ---@param text string
     function CompactVendorFrameMerchantStackSplitTemplate:OnChar(text)
         if self.isMultiStack and self.maxStack < self.minSplit * text then
             return
@@ -3998,9 +4005,9 @@ local CompactVendorFrameMerchantIconTemplate do
     ---@param self Region
     ---@param anchor IconShapeMaskAnchor|FramePoint[]
     local function UnpackAnchorArgs(self, anchor)
-        local anchor1, anchor2, anchor3, anchor4, anchor5 = unpack(anchor) ---@diagnostic disable-line: param-type-mismatch
-        if anchor2 == "$parent.Texture" then
-            anchor2 = self:GetParent().Texture ---@diagnostic disable-line: undefined-field
+        local anchor1, anchor2, anchor3, anchor4, anchor5 = unpack(anchor)
+        if anchor2 == "$parent.Texture" then ---@diagnostic expect-line: impossible-comparison
+            anchor2 = self:GetParent().Texture ---@diagnostic expect-line: undefined-field
         end
         return anchor1, anchor2, anchor3, anchor4, anchor5
     end
@@ -4134,9 +4141,12 @@ end
 ---@class CompactVendorFrameMerchantButtonCostButtonTemplate
 local CompactVendorFrameMerchantButtonCostButtonTemplate do
 
-    ---@param itemLink string
+    ---@param itemLink? string
     ---@return number
     local function CountAvailableItems(itemLink)
+        if not itemLink then
+            return 0
+        end
         local count = GetItemCount(itemLink, true, false, true, true)
         if count and count > 0 then
             return count
@@ -4598,16 +4608,26 @@ local CompactVendorFrameMerchantButtonTemplate do
         local requiresConfirmation = not merchantItem:CanSkipConfirmation()
         local canBeRefunded = merchantItem:CanBeRefunded()
         if requiresConfirmation and (isCalledFromStackSplitFrame ~= true or not canBeRefunded) then
-            self:SetID(index)
-            self.showNonrefundablePrompt = not canBeRefunded
-            self.count = quantity
-            self.link = merchantItem.itemLink
-            self.price = merchantItem.price and merchantItem.price > 0 and merchantItem.price or nil
-            self.color = { merchantItem.qualityColor.r, merchantItem.qualityColor.g, merchantItem.qualityColor.b }
-            self.name = merchantItem.name
-            self.texture = merchantItem.texture
-            MerchantFrame_ConfirmExtendedItemCost(self, quantity)
-            if not self.showNonrefundablePrompt then
+            ---@class CompactVendorFrameMerchantButtonTemplate_MerchantFrame_ConfirmExtendedItemCost : CompactVendorFrameMerchantButtonTemplate
+            ---@field public showNonrefundablePrompt boolean
+            ---@field public count number
+            ---@field public link? string
+            ---@field public price? number
+            ---@field public color? [number, number, number]
+            ---@field public name string
+            ---@field public texture string|number
+            local _self = self ---@type CompactVendorFrameMerchantButtonTemplate_MerchantFrame_ConfirmExtendedItemCost
+            _self:SetID(index)
+            _self.showNonrefundablePrompt = not canBeRefunded
+            _self.count = quantity
+            _self.link = merchantItem.itemLink
+            _self.price = merchantItem.price and merchantItem.price > 0 and merchantItem.price or nil
+            local color = merchantItem.qualityColor or ColorPreset.White
+            _self.color = { color.r, color.g, color.b }
+            _self.name = merchantItem.name
+            _self.texture = merchantItem.texture
+            MerchantFrame_ConfirmExtendedItemCost(_self, quantity)
+            if not _self.showNonrefundablePrompt then
                 return
             end
             local _, frame = StaticPopup_Visible("CONFIRM_PURCHASE_NONREFUNDABLE_ITEM")
