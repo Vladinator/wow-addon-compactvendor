@@ -31,6 +31,11 @@ end
 
 do
 
+    ---@class CompactVendorFilterDropDownLearnable : CompactVendorFilterDropDownTemplate
+    ---@field public values table<CompactVendorFilterDropDownLearnableOptionValue, boolean?>
+    ---@field public options CompactVendorFilterDropDownLearnableOption[]
+    ---@field public GetOption fun(self: CompactVendorFilterDropDownLearnable, valueOrText: CompactVendorFilterDropDownLearnableOptionValue, autoCreate?: boolean|fun(option: CompactVendorFilterDropDownLearnableOption, index: number):boolean?)
+
     ---@alias CompactVendorFilterDropDownLearnableOptionValue 1|2|3
 
     ---@class CompactVendorFilterDropDownLearnableOption : CompactVendorFilterDropDownTemplateOption
@@ -66,14 +71,14 @@ do
         return not not collectable, not not collected, current, total
     end
 
-    ---@param self CompactVendorFilterDropDownTemplate
+    ---@param self CompactVendorFilterDropDownLearnable
     ---@param collected boolean
     ---@param current number
     ---@param total number
     ---@return CompactVendorFilterDropDownLearnableOption option
     local function GetCollectableOption(self, collected, current, total)
-        local value ---@type CompactVendorFilterDropDownLearnableOptionValue
-        local text ---@type string
+        local value ---@type CompactVendorFilterDropDownLearnableOptionValue?
+        local text ---@type string?
         if collected then
             if current == total then
                 value = 1
@@ -89,8 +94,7 @@ do
             value = 3
             text = NO
         end
-        ---@type CompactVendorFilterDropDownLearnableOption
-        local option = self:GetOption(value, true) ---@diagnostic disable-line: assign-type-mismatch
+        local option = self:GetOption(value, true)
         option.value = value
         option.text = text
         return option
@@ -99,9 +103,10 @@ do
     local filter = CompactVendorFilterDropDownTemplate:New(
         "Learnable: Collected", {},
         "itemLink", {},
+        ---@param self CompactVendorFilterDropDownLearnable
         function(self)
             local items = self.parent:GetMerchantItems()
-            local values = self.values ---@type table<CompactVendorFilterDropDownLearnableOptionValue, boolean?>
+            local values = self.values
             table.wipe(values)
             for _, itemData in ipairs(items) do
                 local collectable, collected, current, total = GetCollectedStatus(itemData)
@@ -112,6 +117,7 @@ do
                 end
             end
         end,
+        ---@param self CompactVendorFilterDropDownLearnable
         function(self, _, itemData)
             local collectable, collected, current, total = GetCollectedStatus(itemData)
             if not collectable then

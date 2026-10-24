@@ -3,6 +3,11 @@ local CompactVendorFilterDropDownTemplate = CompactVendorFilterDropDownTemplate 
 local ns = select(2, ...) ---@class CompactVendorNS
 local ItemRequirementType = ns.ItemRequirementType
 
+---@class CompactVendorFilterDropDownRequirement : CompactVendorFilterDropDownTemplate
+---@field public values table<CompactVendorFilterDropDownRequirementOptionValue, boolean?>
+---@field public options CompactVendorFilterDropDownRequirementOption[]
+---@field public GetOption fun(self: CompactVendorFilterDropDownRequirement, valueOrText: CompactVendorFilterDropDownRequirementOptionValue, autoCreate?: boolean|fun(option: CompactVendorFilterDropDownRequirementOption, index: number):boolean?)
+
 ---@alias CompactVendorFilterDropDownRequirementOptionValue false|string
 
 ---@class CompactVendorFilterDropDownRequirementOption : CompactVendorFilterDropDownTemplateOption
@@ -94,7 +99,7 @@ local noRequirementValueTable = {
     false,
 }
 
----@param value? false|string|ItemRequirementInfo
+---@param value? CompactVendorFilterDropDownRequirementOptionValue|ItemRequirementInfo
 local function getText(value)
     if not value then
         return noRequirementOption.text
@@ -138,10 +143,11 @@ end
 local filter = CompactVendorFilterDropDownTemplate:New(
     "Requirements", {},
     "hasRequirementsInfo", {},
+    ---@param self CompactVendorFilterDropDownRequirement
     function(self)
         local items = self.parent:GetMerchantItems()
         local itemDataKey = self.itemDataKey
-        local values = self.values ---@type table<CompactVendorFilterDropDownRequirementOptionValue, boolean?>
+        local values = self.values
         table.wipe(values)
         table.wipe(textCache)
         for _, itemData in ipairs(items) do
@@ -156,13 +162,13 @@ local filter = CompactVendorFilterDropDownTemplate:New(
             end
         end
         for value, _ in pairs(values) do
-            ---@type CompactVendorFilterDropDownRequirementOption
-            local option = self:GetOption(value, true) ---@diagnostic disable-line: assign-type-mismatch
+            local option = self:GetOption(value, true)
             option.value = value
             option.text = getText(value)
             option.show = true
         end
     end,
+    ---@param self CompactVendorFilterDropDownRequirement
     ---@param requirementsInfo? CompactVendorFilterDropDownRequirementOptionValue[]
     function(self, requirementsInfo)
         return FilterItemValue(self.options, requirementsInfo)

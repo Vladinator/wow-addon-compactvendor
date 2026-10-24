@@ -1,4 +1,4 @@
-local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded ---@diagnostic disable-line: undefined-global
+local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded
 
 local ns = select(2, ...) ---@type CompactVendorNS
 local FrameUtil = ns.FrameUtil
@@ -21,7 +21,7 @@ local CompactVendorFrame = CompactVendorFrame ---@type CompactVendorFrame
 
 local CloseDropDownMenus = CloseDropDownMenus ---@type fun(level?: number)
 local ToggleDropDownMenu = ToggleDropDownMenu ---@type fun(level?: number, value?: any, dropDownFrame?: Region, anchorName?: Region, xOffset?: number, yOffset?: number, menuList?: table, button?: string, autoHideDelay?: boolean)
-local UIDropDownMenu_SetInitializeFunction = UIDropDownMenu_SetInitializeFunction ---@type fun(self: Region, init: fun())
+local UIDropDownMenu_SetInitializeFunction = UIDropDownMenu_SetInitializeFunction ---@type fun(self: Region, init: fun(self: Region, level?: number))
 local UIDropDownMenu_AddButton = UIDropDownMenu_AddButton ---@type fun(info: DropdownInfoPolyfill, level?: number)
 
 ---@class CompactVendorFilterButtonTemplate
@@ -91,19 +91,19 @@ local CompactVendorFilterFrameTemplate do
     function CompactVendorFilterFrameTemplate:OnLoad()
         self.MerchantDataProvider = CompactVendorFrame.ScrollBox:GetDataProvider()
         self.Button = CompactVendorFilterButton ---@type CompactVendorFilterButtonTemplate
-        self:SetParent(self.Button) ---@diagnostic disable-line: param-type-mismatch
+        self:SetParent(self.Button)
         self:SetFrameStrata("HIGH")
         self:SetToplevel(true)
         self:EnableMouse(true)
         self:Hide()
         FrameUtil.RegisterFrameForEvents(self, self.Events)
         self.Filters = {} ---@type table<string, CompactVendorFilterTemplate>
-        ---@diagnostic disable-next-line: assign-type-mismatch
+        ---@diagnostic expect-next-line: assign-type-mismatch
         self.DropdownInfo = { text = nil, func = nil } ---@type DropdownInfoPolyfill
         self.DropdownSortedFilters = {} ---@type string[]
         self.VendorOpen = false
         self.VendorUpdating = false
-        UIDropDownMenu_SetInitializeFunction(self, self.DropdownInitialize)
+        UIDropDownMenu_SetInitializeFunction(self, function(_, ...) self:DropdownInitialize(...) end)
         local function onLoading()
             -- self:RefreshFilters(true)
             self.Button:Hide()
@@ -234,7 +234,7 @@ local CompactVendorFilterFrameTemplate do
             info.isTitle = nil
             info.disabled = nil
             info.text = format("%s%s%s", GREEN_FONT_COLOR_CODE, COMBAT_LOG_MENU_EVERYTHING, FONT_COLOR_CODE_CLOSE)
-            ---@diagnostic disable-next-line: duplicate-set-field
+            ---@diagnostic expect-next-line: duplicate-set-field
             info.func = function()
                 for _, filter in pairs(self.Filters) do
                     filter:ShowAll()
@@ -243,7 +243,6 @@ local CompactVendorFilterFrameTemplate do
             end
             UIDropDownMenu_AddButton(info, level)
             info.text = format("%s%s%s", NORMAL_FONT_COLOR_CODE, RESET, FONT_COLOR_CODE_CLOSE)
-            ---@diagnostic disable-next-line: duplicate-set-field
             info.func = function()
                 for _, filter in pairs(self.Filters) do
                     if filter:IsRelevant() then
@@ -254,7 +253,6 @@ local CompactVendorFilterFrameTemplate do
             end
             UIDropDownMenu_AddButton(info, level)
             info.text = CLOSE
-            ---@diagnostic disable-next-line: duplicate-set-field
             info.func = function()
                 if self == UIDROPDOWNMENU_OPEN_MENU then
                     CloseDropDownMenus()
@@ -297,11 +295,11 @@ local CompactVendorFilterFrameTemplate do
             return
         end
         ---@type Button
-        local button = self:GetParent() ---@diagnostic disable-line: assign-type-mismatch
+        local button = self:GetParent() ---@diagnostic expect-line: assign-type-mismatch
         S:HandleButton(button)
         button:SetSize(20, 20)
-        button.Icon:SetRotation(S.ArrowRotation["down"]) ---@diagnostic disable-line: undefined-field
-        button.Icon:Show() ---@diagnostic disable-line: undefined-field
+        button.Icon:SetRotation(S.ArrowRotation["down"]) ---@diagnostic expect-line: undefined-field
+        button.Icon:Show() ---@diagnostic expect-line: undefined-field
         self.setupElvUI = true
     end
 
@@ -363,7 +361,7 @@ local CompactVendorFilterTemplate do
     ---@param name string?
     ---@param defaults CompactVendorFilterTemplateDefaults?
     function CompactVendorFilterTemplate:New(name, defaults)
-        ---@diagnostic disable-next-line: missing-fields
+        ---@diagnostic expect-next-line: missing-fields
         local filter = {} ---@type CompactVendorFilterTemplate
         Mixin(filter, self)
         if name ~= nil then
@@ -393,7 +391,7 @@ local CompactVendorFilterToggleTemplate do
     ---@class CompactVendorFilterToggleTemplate : CompactVendorFilterTemplate
     ---@field public key string
     ---@field public itemDataKey string
-    ---@field public isChecked? CompactVendorFilterToggleTemplateIsChecked
+    ---@field public isChecked CompactVendorFilterToggleTemplateIsChecked
     ---@field public isLogicReversed? boolean
     ---@field public isCheckLogicReversed? boolean
 
@@ -433,7 +431,7 @@ local CompactVendorFilterToggleTemplate do
     ---@param itemData MerchantItem
     ---@return boolean? isFiltered
     function CompactVendorFilterToggleTemplate:IsFiltered(itemData)
-        local value = itemData[self.itemDataKey] ---@type any?
+        local value = itemData[self.itemDataKey]
         if value == nil then
             return
         end
@@ -471,7 +469,7 @@ local CompactVendorFilterToggleTemplate do
         if level ~= 1 then
             return
         end
-        ---@diagnostic disable-next-line: assign-type-mismatch
+        ---@diagnostic expect-next-line: assign-type-mismatch
         local info = { text = nil, func = nil } ---@type DropdownInfoPolyfill
         info.keepShownOnClick = true
         info.isNotRadio = true
@@ -499,7 +497,7 @@ local CompactVendorFilterToggleTemplate do
     ---@param isCheckLogicReversed boolean?
     function CompactVendorFilterToggleTemplate:New(name, defaults, key, itemDataKey, isChecked, isLogicReversed, isCheckLogicReversed)
         ---@type CompactVendorFilterToggleTemplate
-        local filter = CompactVendorFilterTemplate:New(name, defaults) ---@diagnostic disable-line: assign-type-mismatch
+        local filter = CompactVendorFilterTemplate:New(name, defaults)
         Mixin(filter, self)
         filter.key = key
         filter.itemDataKey = itemDataKey
@@ -630,7 +628,7 @@ local CompactVendorFilterDropDownTemplate do
     ---@param level number
     function CompactVendorFilterDropDownTemplate:GetDropdown(level)
         if level == 1 then
-            ---@diagnostic disable-next-line: assign-type-mismatch
+            ---@diagnostic expect-next-line: assign-type-mismatch
             local info = { text = nil, func = nil } ---@type DropdownInfoPolyfill
             info.keepShownOnClick = true
             info.isNotRadio = true
@@ -652,7 +650,7 @@ local CompactVendorFilterDropDownTemplate do
             end
             UIDropDownMenu_AddButton(info, level)
         elseif level == 2 and self.name == UIDROPDOWNMENU_MENU_VALUE then
-            ---@diagnostic disable-next-line: assign-type-mismatch
+            ---@diagnostic expect-next-line: assign-type-mismatch
             local info = { text = nil, func = nil } ---@type DropdownInfoPolyfill
             info.keepShownOnClick = true
             info.isNotRadio = true
@@ -683,15 +681,15 @@ local CompactVendorFilterDropDownTemplate do
             end
         end
         if not autoCreate then
-            return nil, nil ---@diagnostic disable-line: return-type-mismatch
+            return nil, nil ---@diagnostic expect-line: return-type-mismatch
         end
         ---@type CompactVendorFilterDropDownTemplateOption
-        local option = { value = nil, text = nil, checked = true } ---@diagnostic disable-line: assign-type-mismatch
+        local option = { value = nil, text = nil, checked = true } ---@diagnostic expect-line: assign-type-mismatch
         local index = #options + 1
         if type(autoCreate) == "function" then
             local result = autoCreate(option, index)
             if result == false then
-                return nil, nil ---@diagnostic disable-line: return-type-mismatch
+                return nil, nil ---@diagnostic expect-line: return-type-mismatch
             end
         end
         options[index] = option
@@ -719,7 +717,7 @@ local CompactVendorFilterDropDownTemplate do
     ---@param isAccumulative boolean?
     function CompactVendorFilterDropDownTemplate:New(name, defaults, itemDataKey, options, onRefresh, getValue, hasValue, isAccumulative)
         ---@type CompactVendorFilterDropDownTemplate
-        local filter = CompactVendorFilterTemplate:New(name, defaults) ---@diagnostic disable-line: assign-type-mismatch
+        local filter = CompactVendorFilterTemplate:New(name, defaults)
         Mixin(filter, self)
         filter.values = Mixin({}, defaults and defaults.values or {})
         filter.itemDataKey = itemDataKey
@@ -781,9 +779,10 @@ local CompactVendorFilterDropDownWrapperTemplate do
     ---@param name string?
     ---@param itemDataKey string
     ---@param valueIsLocaleKey boolean?
+    ---@diagnostic expect-next-line: incompatible-override
     function CompactVendorFilterDropDownWrapperTemplate:New(name, itemDataKey, valueIsLocaleKey)
         ---@type CompactVendorFilterDropDownWrapperTemplate
-        local filter = CompactVendorFilterDropDownTemplate:New(name, {}, itemDataKey, {}, self.OnRefreshWrapper) ---@diagnostic disable-line: assign-type-mismatch
+        local filter = CompactVendorFilterDropDownTemplate:New(name, {}, itemDataKey, {}, self.OnRefreshWrapper) ---@diagnostic expect-line: assign-type-mismatch
         Mixin(filter, self)
         filter.valueIsLocaleKey = valueIsLocaleKey
         return filter
@@ -865,6 +864,7 @@ local CompactVendorFilterDropDownToggleWrapperTemplate do
     ---@param getValueKey CompactVendorFilterDropDownToggleWrapperTemplateGetValueKey?
     ---@param getValueText CompactVendorFilterDropDownToggleWrapperTemplateGetValueText?
     ---@param isYesNo boolean?
+    ---@diagnostic expect-next-line: incompatible-override
     function CompactVendorFilterDropDownToggleWrapperTemplate:New(name, getValueKey, getValueText, isYesNo)
         local filter = CompactVendorFilterDropDownTemplate:New(name, {}, "itemLink", {}, self.OnRefreshWrapper, self.GetValueWrapper, self.HasValueWrapper) ---@class CompactVendorFilterDropDownToggleWrapperTemplate
         Mixin(filter, self)

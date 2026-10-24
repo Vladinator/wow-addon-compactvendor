@@ -1,8 +1,8 @@
 local strcmputf8i = strcmputf8i ---@type fun(str1: string|number, str2: string|number): result: number
-local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant ---@diagnostic disable-line: deprecated
-local GetItemClassInfo = GetItemClassInfo or C_Item.GetItemClassInfo ---@diagnostic disable-line: deprecated
-local GetItemSubClassInfo = GetItemSubClassInfo or C_Item.GetItemSubClassInfo ---@diagnostic disable-line: deprecated
-local GetItemInfo = GetItemInfo or C_Item.GetItemInfo ---@diagnostic disable-line: deprecated
+local GetItemInfoInstant = GetItemInfoInstant or C_Item.GetItemInfoInstant ---@diagnostic expect-line: deprecated
+local GetItemClassInfo = GetItemClassInfo or C_Item.GetItemClassInfo ---@diagnostic expect-line: deprecated
+local GetItemSubClassInfo = GetItemSubClassInfo or C_Item.GetItemSubClassInfo ---@diagnostic expect-line: deprecated
+local GetItemInfo = GetItemInfo or C_Item.GetItemInfo ---@diagnostic expect-line: deprecated
 
 local ns = select(2, ...) ---@class CompactVendorNS
 
@@ -166,7 +166,7 @@ local function HasMod(mod, part, value)
     if not part or not mod or not value then
         return
     end
-    ---@type boolean, CompactVendorSearchModOperator, string
+    ---@type boolean|string, CompactVendorSearchModOperator|"", string
     local negate, operator, criteria = part:match(CompactVendorSearchModOperatorPattern)
     negate = negate == "!"
     if not operator or operator == "" then
@@ -175,8 +175,8 @@ local function HasMod(mod, part, value)
     if not criteria then
         criteria = ""
     end
-    local safeValue = value ---@type any
-    local safeCriteria = criteria ---@type any
+    local safeValue = value
+    local safeCriteria = criteria ---@type CompactVendorSearchModOperator|number
     local has ---@type boolean?
     if mod == "t" or mod == "e" or mod == "n" or mod == "b" then
         safeValue = type(value) == "string" and value or tostring(value) ---@type string

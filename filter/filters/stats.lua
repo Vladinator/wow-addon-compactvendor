@@ -65,7 +65,7 @@ local function UpdateItemStatTable(itemLink)
         ReMapStatTable()
         return statTable
     end
-    local GetItemStats = GetItemStats ---@diagnostic disable-line: undefined-global
+    local GetItemStats = GetItemStats ---@type (fun(itemLink: string, statTable?: StatTablePolyfill): StatTablePolyfill?)?
     if GetItemStats then
         statTable = statTable or {}
         table.wipe(statTable)
@@ -75,6 +75,11 @@ local function UpdateItemStatTable(itemLink)
     ReMapStatTable()
     return statTable
 end
+
+---@class CompactVendorFilterDropDownStats : CompactVendorFilterDropDownTemplate
+---@field public values table<CompactVendorFilterDropDownStatsOptionValue, boolean?>
+---@field public options CompactVendorFilterDropDownStatsOption[]
+---@field public GetOption fun(self: CompactVendorFilterDropDownStats, valueOrText: string, autoCreate?: boolean|fun(option: CompactVendorFilterDropDownStatsOption, index: number):boolean?)
 
 ---@alias CompactVendorFilterDropDownStatsOptionValue string
 
@@ -99,10 +104,11 @@ end
 local filter = CompactVendorFilterDropDownTemplate:New(
     "Stats", {},
     "itemLink", {},
+    ---@param self CompactVendorFilterDropDownStats
     function(self)
         local items = self.parent:GetMerchantItems()
         local itemDataKey = self.itemDataKey
-        local values = self.values ---@type table<CompactVendorFilterDropDownStatsOptionValue, boolean?>
+        local values = self.values
         table.wipe(values)
         for _, itemData in ipairs(items) do
             local itemLink = itemData[itemDataKey] ---@type string
@@ -113,13 +119,13 @@ local filter = CompactVendorFilterDropDownTemplate:New(
             end
         end
         for value, _ in pairs(values) do
-            ---@type CompactVendorFilterDropDownStatsOption
-            local option = self:GetOption(value, true) ---@diagnostic disable-line: assign-type-mismatch
+            local option = self:GetOption(value, true)
             option.value = value
             option.text = GetStatText(value)
             option.show = true
         end
     end,
+    ---@param self CompactVendorFilterDropDownStats
     function(self, itemLink)
         local itemValue = UpdateItemStatTable(itemLink)
         if not itemValue then

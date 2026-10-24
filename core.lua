@@ -249,9 +249,9 @@ local ConvertToPattern do
 
         if not r or not g or not b then
 
-            r = tonumber(hex:sub(3, 4), 16) ---@diagnostic disable-line: param-type-mismatch
-            g = tonumber(hex:sub(5, 6), 16) ---@diagnostic disable-line: param-type-mismatch
-            b = tonumber(hex:sub(7, 8), 16) ---@diagnostic disable-line: param-type-mismatch
+            r = tonumber(hex:sub(3, 4), 16)
+            g = tonumber(hex:sub(5, 6), 16)
+            b = tonumber(hex:sub(7, 8), 16)
 
             if r and g and b then
 
@@ -856,7 +856,7 @@ local IsTooltipTextPending do
         for _, line in ipairs(tooltipData.lines) do
             Mixin(line, TooltipItemLine)
         end
-        self.tooltipData = tooltipData ---@diagnostic disable-line: assign-type-mismatch
+        self.tooltipData = tooltipData ---@diagnostic expect-line: assign-type-mismatch
         if type(hyperlinkOrIndex) == "string" then
             self.hyperlink = hyperlinkOrIndex
             self.optionalArg1 = optionalArg1
@@ -1238,7 +1238,7 @@ local C_TooltipInfo do
             ---@param optionalArg2? number
             ---@param hideVendorPrice? boolean
             ---@return TooltipData tooltipData
-            ---@diagnostic disable-next-line: duplicate-set-field
+            ---@diagnostic expect-next-line: duplicate-set-field
             function C_TooltipInfo.GetHyperlink(hyperlink, optionalArg1, optionalArg2, hideVendorPrice)
                 return BackupTooltipScanner:ScanHyperlink(hyperlink)
             end
@@ -1247,7 +1247,7 @@ local C_TooltipInfo do
         if C_TooltipInfo.GetMerchantItem == noop then
             ---@param merchantItemIndex number
             ---@return TooltipData tooltipData
-            ---@diagnostic disable-next-line: duplicate-set-field
+            ---@diagnostic expect-next-line: duplicate-set-field
             function C_TooltipInfo.GetMerchantItem(merchantItemIndex)
                 local hyperlink = GetMerchantItemLink(merchantItemIndex)
                 return BackupTooltipScanner:ScanHyperlink(hyperlink)
@@ -1340,7 +1340,7 @@ local TooltipScanner do
 			end
 			done = true
 			local tooltipData = self:GetTooltipData()
-			callback(tooltipData, self) ---@diagnostic disable-line: param-type-mismatch
+			callback(tooltipData, self)
 		end
 		---@type TooltipDataHandlerTooltipInfo
 		local processInfo = {
@@ -1935,18 +1935,18 @@ local RefreshAndUpdateMerchantItemButton do
     function MerchantItem:GetMerchantItemInfo()
         local index, hasIndex = self:GetIndex()
         if not hasIndex then
-            return ---@diagnostic disable-line: missing-return-value
+            return ---@diagnostic expect-line: missing-return-value
         end
         local temp = {GetMerchantItemInfo(index)}
         local arg1 = temp[1]
         if not arg1 then
-            return ---@diagnostic disable-line: missing-return-value
+            return ---@diagnostic expect-line: missing-return-value
         end
         local info = type(arg1) == "table" and arg1 or nil
         if info then
             return info.name, info.texture, info.price, info.stackCount, info.numAvailable, info.isPurchasable, info.isUsable, info.hasExtendedCost, info.currencyID, info.spellID
         end
-        return temp[1], temp[2], temp[3], temp[4], temp[5], temp[6], temp[7], temp[8], temp[9], temp[10] ---@diagnostic disable-line: return-type-mismatch
+        return temp[1], temp[2], temp[3], temp[4], temp[5], temp[6], temp[7], temp[8], temp[9], temp[10]
     end
 
     function MerchantItem:Refresh()
@@ -1974,8 +1974,8 @@ local RefreshAndUpdateMerchantItemButton do
         self.itemLink = GetMerchantItemLink(index)
         self.merchantItemID = GetMerchantItemID(index)
         self.itemLinkOrID = self.itemLink or self.merchantItemID
-        self.isHeirloom = self.merchantItemID and C_Heirloom and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
-        self.isKnownHeirloom = self.isHeirloom and C_Heirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID) ---@diagnostic disable-line: assign-type-mismatch
+        self.isHeirloom = self.merchantItemID and C_Heirloom and C_Heirloom.IsItemHeirloom(self.merchantItemID) ---@diagnostic expect-line: assign-type-mismatch
+        self.isKnownHeirloom = self.isHeirloom and C_Heirloom and C_Heirloom.PlayerHasHeirloom(self.merchantItemID)
         self.showNonrefundablePrompt = C_MerchantFrame and C_MerchantFrame.IsMerchantItemRefundable and not C_MerchantFrame.IsMerchantItemRefundable(index)
         self.tintRed = not self.isPurchasable or (not self.isUsable and not self.isHeirloom)
         if self.numAvailable == 0 or self.isKnownHeirloom then
@@ -1993,7 +1993,7 @@ local RefreshAndUpdateMerchantItemButton do
         for i = 1, self.extendedCostCount do
             local costItem = self.extendedCostItems[i]
             if not costItem then
-                ---@diagnostic disable-next-line: assign-type-mismatch
+                ---@diagnostic expect-next-line: assign-type-mismatch
                 costItem = { count = nil } ---@type MerchantItemCostItem
                 self.extendedCostItems[i] = costItem
             end
@@ -2437,7 +2437,7 @@ local MerchantScanner do
     ---@field public GenerateCallbackEvents fun(self: CallbackRegistry, events: MerchantScannerEvent[])
 
     ---@class MerchantScanner : Frame, CallbackRegistry
-    MerchantScanner = CreateFrame("Frame") ---@diagnostic disable-line: cast-local-type
+    MerchantScanner = CreateFrame("Frame")
 
     Mixin(MerchantScanner, CallbackRegistryMixin)
     CallbackRegistryMixin.OnLoad(MerchantScanner)
@@ -2516,7 +2516,7 @@ local MerchantScanner do
     )
 
     ---@type MerchantItemFramePool
-    MerchantScanner.buttonPool = CreateFramePool("Button", nil, "CompactVendorFrameMerchantButtonTemplate") ---@diagnostic disable-line: assign-type-mismatch
+    MerchantScanner.buttonPool = CreateFramePool("Button", nil, "CompactVendorFrameMerchantButtonTemplate") ---@diagnostic expect-line: assign-type-mismatch
 
     ---@return boolean merchantExists
     function MerchantScanner:UpdateMerchantInfo()
@@ -2927,7 +2927,7 @@ end
 local Frame do
 
     ---@class CompactVendorFrame : Frame
-    Frame = CreateFrame("Frame", addonName .. "Frame", MerchantBuyBackItem) ---@diagnostic disable-line: cast-local-type
+    Frame = CreateFrame("Frame", addonName .. "Frame", MerchantBuyBackItem)
 
     ---@type WowEvent[]
     Frame.Events = {
@@ -2979,7 +2979,7 @@ local Frame do
                 text = ""
             end
             text = text:lower()
-            text = text:trim() ---@diagnostic disable-line: undefined-field
+            text = text:trim()
             searchText = text
             MerchantDataProvider:Refresh()
         end
@@ -3233,7 +3233,7 @@ local Frame do
         self.ScrollBox = CreateFrame("Frame", nil, self, "WowScrollBoxList") ---@class CompactVendorFrameScrollBox
         self.ScrollBox:SetSize(466, 386)
         self.ScrollBox:SetPoint("TOPLEFT", 7, -64)
-        self.ScrollBox:SetAllPoints() ---@diagnostic disable-line: missing-parameter
+        self.ScrollBox:SetAllPoints()
 
         self.Loading = CreateFrame("Frame", nil, self, "SpinnerWithShadowTemplate")
         self.Loading:SetSize(128, 128)
@@ -3361,7 +3361,7 @@ local Frame do
             end
 
             ---@type SettingsAdvancedSliderTemplate
-            local control = CreateFrame("Frame", nil, panel, "SettingsAdvancedSliderTemplate") ---@diagnostic disable-line: assign-type-mismatch
+            local control = CreateFrame("Frame", nil, panel, "SettingsAdvancedSliderTemplate")
 
             control:SetPoint("TOPLEFT", 0, 0)
             control.Text:SetText(name)
@@ -3452,7 +3452,7 @@ local Frame do
         end
 
         ---@type CompactVendorFilterFrameTemplate
-        local frame = CreateFrame("Frame", addonName .. "FilterFrame") ---@diagnostic disable-line: assign-type-mismatch
+        local frame = CreateFrame("Frame", addonName .. "FilterFrame")
         Mixin(frame, CompactVendorFilterFrameTemplate)
 
         frame:OnLoad()
@@ -3513,13 +3513,13 @@ local CompactVendorFrameAutoSizeTemplate do
     function CompactVendorFrameAutoSizeTemplate:AutoSize()
         self:Show()
         self:SetWidth(1)
-        AutoSize({ self:GetChildren() }) ---@diagnostic disable-line: assign-type-mismatch
+        AutoSize({ self:GetChildren() }) ---@diagnostic expect-line: assign-type-mismatch
         local _, _, width = self:GetBoundsRect()
         if not width then
             return
         end
         if self.isIconTextTemplate then
-            -- ---@diagnostic disable-next-line: assign-type-mismatch
+            -- ---@diagnostic expect-next-line: assign-type-mismatch
             -- local cost = self ---@type CompactVendorFrameMerchantIconTemplate
             -- if cost and cost.Texture and not cost.mode then
             --     width = width - (cost.Texture:IsShown() and cost.Texture:GetWidth() or 0)
@@ -3556,7 +3556,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
         self.typing = 0
         self.split = 0
         self:Hide()
-        self:SetParent(UIParent) ---@diagnostic disable-line: param-type-mismatch
+        self:SetParent(UIParent)
         self:SetFrameStrata("HIGH")
         self:SetClampedToScreen(true)
         self:SetToplevel(true)
@@ -3687,7 +3687,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
         self.minSplit = stackCount or 1
         self.split = self.minSplit
         self.typing = 0
-        self.StackSplitText:SetText(self.split) ---@diagnostic disable-line: param-type-mismatch
+        self.StackSplitText:SetText(self.split)
         self.LeftButton:Disable()
         self.RightButton:Enable()
         self:ClearAllPoints()
@@ -3731,7 +3731,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
             self.StackSplitText:SetText(STACKS:format(self.split/self.minSplit))
             self.StackItemCountText:SetText(TOTAL_STACKS:format(self.split))
         else
-            self.StackSplitText:SetText(self.split) ---@diagnostic disable-line: param-type-mismatch
+            self.StackSplitText:SetText(self.split)
         end
     end
 
@@ -3747,7 +3747,7 @@ local CompactVendorFrameMerchantStackSplitTemplate do
         end
         if self.split > self.maxStack then
             self.split = self.maxStack
-            self.StackSplitText:SetText(self.split) ---@diagnostic disable-line: param-type-mismatch
+            self.StackSplitText:SetText(self.split)
         end
         self.RightButton:SetEnabled(self.split ~= self.maxStack)
         self.LeftButton:SetEnabled(self.split ~= 1)
@@ -3796,12 +3796,12 @@ local CompactVendorFrameMerchantButtonQuantityTemplate do
         ---@type BuyEmAll
         function BuyEmAll()
             ---@type BuyEmAllFrame
-            local buyEmAllFrame = _G.BuyEmAllFrame ---@diagnostic disable-line: undefined-field
+            local buyEmAllFrame = _G.BuyEmAllFrame ---@diagnostic expect-line: undefined-field
             if not buyEmAllFrame or type(buyEmAllFrame) ~= "table" or type(buyEmAllFrame.GetObjectType) ~= "function" then
                 return
             end
             ---@type BuyEmAllAPI
-            local buyEmAll = _G.BuyEmAll ---@diagnostic disable-line: undefined-field
+            local buyEmAll = _G.BuyEmAll ---@diagnostic expect-line: undefined-field
             if not buyEmAll or type(buyEmAll) ~= "table" or type(buyEmAll.MerchantItemButton_OnModifiedClick) ~= "function" then
                 return
             end
@@ -3825,7 +3825,7 @@ local CompactVendorFrameMerchantButtonQuantityTemplate do
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:Open()
         ---@type CompactVendorFrameMerchantButtonTemplate
-        local owner = self:GetParent() ---@diagnostic disable-line: assign-type-mismatch
+        local owner = self:GetParent() ---@diagnostic expect-line: assign-type-mismatch
         local buyEmAllFrame, buyEmAllFunc = BuyEmAll()
         if buyEmAllFrame and buyEmAllFunc and buyEmAllFunc(owner, "LeftButton") then
             buyEmAllFrame:SetPoint("BOTTOMLEFT", self, "TOPLEFT", 8, 0)
@@ -3855,8 +3855,8 @@ local CompactVendorFrameMerchantButtonQuantityTemplate do
 
     function CompactVendorFrameMerchantButtonQuantityTemplate:OnLoad()
         self:RegisterForClicks("LeftButtonUp")
-        self:GetNormalTexture():SetTexCoord(0.15625, 0.5, 0.84375, 0.5, 0.15625, 0, 0.84375, 0) ---@diagnostic disable-line: undefined-field
-        self:GetHighlightTexture():SetTexCoord(0.15625, 1, 0.84375, 1, 0.15625, 0.5, 0.84375, 0.5) ---@diagnostic disable-line: undefined-field
+        self:GetNormalTexture():SetTexCoord(0.15625, 0.5, 0.84375, 0.5, 0.15625, 0, 0.84375, 0)
+        self:GetHighlightTexture():SetTexCoord(0.15625, 1, 0.84375, 1, 0.15625, 0.5, 0.84375, 0.5)
         -- required by StackSplitFrame
         self.hasStackSplit = 0
         self.SplitStack = self.StackSplitFrameCallback
@@ -3949,15 +3949,15 @@ local CompactVendorFrameMerchantIconTemplate do
 
     ---@type IconShapeInfoItem[]
     local IconShapeInfo = {
-        [IconShape.None] = InheritFromBase({ ---@diagnostic disable-line: missing-fields
+        [IconShape.None] = InheritFromBase({ ---@diagnostic expect-line: missing-fields
         }),
         [IconShape.Round] = InheritFromBase({
-            icon = { ---@diagnostic disable-line: missing-fields
+            icon = { ---@diagnostic expect-line: missing-fields
                 mask = 130924,
                 maskSize = 16,
                 maskAnchor = { "LEFT", 6, 0 },
             },
-            border = { ---@diagnostic disable-line: missing-fields
+            border = { ---@diagnostic expect-line: missing-fields
                 file = "Interface\\Minimap\\MiniMap-TrackingBorder",
                 texCoords = { 0.046875, 0.578125, 0.03125, 0.578125 },
                 mask = 130924,
@@ -3965,37 +3965,37 @@ local CompactVendorFrameMerchantIconTemplate do
             },
         }),
         [IconShape.Square] = InheritFromBase({
-            icon = { ---@diagnostic disable-line: missing-fields
+            icon = { ---@diagnostic expect-line: missing-fields
                 mask = 2443038,
             },
-            border = { ---@diagnostic disable-line: missing-fields
+            border = { ---@diagnostic expect-line: missing-fields
                 file = 2443038,
                 mask = 2443038,
             },
         }),
         [IconShape.Diamond] = InheritFromBase({
-            icon = { ---@diagnostic disable-line: missing-fields
+            icon = { ---@diagnostic expect-line: missing-fields
                 mask = 3152572,
             },
-            border = { ---@diagnostic disable-line: missing-fields
+            border = { ---@diagnostic expect-line: missing-fields
                 file = 3152572,
                 mask = 3152572,
             },
         }),
         [IconShape.Hexagon] = InheritFromBase({
-            icon = { ---@diagnostic disable-line: missing-fields
+            icon = { ---@diagnostic expect-line: missing-fields
                 mask = 426723,
             },
-            border = { ---@diagnostic disable-line: missing-fields
+            border = { ---@diagnostic expect-line: missing-fields
                 file = 426723,
                 mask = 426723,
             },
         }),
         [IconShape.Octagon] = InheritFromBase({
-            icon = { ---@diagnostic disable-line: missing-fields
+            icon = { ---@diagnostic expect-line: missing-fields
                 mask = 3750798,
             },
-            border = { ---@diagnostic disable-line: missing-fields
+            border = { ---@diagnostic expect-line: missing-fields
                 file = 3750798,
                 mask = 3750798,
             },
@@ -4078,7 +4078,7 @@ local CompactVendorFrameMerchantIconTemplate do
 
     ---@param count? number|string
     function CompactVendorFrameMerchantIconTemplate:SetCount(count)
-        self.Count:SetText(count) ---@diagnostic disable-line: param-type-mismatch
+        self.Count:SetText(count)
     end
 
     ---@param merchantItem MerchantItem
@@ -4104,7 +4104,7 @@ local CompactVendorFrameMerchantIconTemplate do
 
     ---@param text? string|number
     function CompactVendorFrameMerchantIconTemplate:SetText(text)
-        self.Text:SetText(text or "") ---@diagnostic disable-line: param-type-mismatch
+        self.Text:SetText(text)
         self:SetMode(false)
     end
 
@@ -4195,7 +4195,7 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
     _G.CompactVendorFrameMerchantButtonCostButtonTemplate = CompactVendorFrameMerchantButtonCostButtonTemplate
 
     function CompactVendorFrameMerchantButtonCostButtonTemplate:OnLoad()
-        self.parent = self:GetParent() ---@diagnostic disable-line: assign-type-mismatch
+        self.parent = self:GetParent() ---@diagnostic expect-line: assign-type-mismatch
         self.costType = "Money"
         self.link = nil
         self.price = nil
@@ -4283,7 +4283,7 @@ local CompactVendorFrameMerchantButtonCostButtonTemplate do
                 local costItem = merchantItem.extendedCostItems[i]
                 if costItem.texture then
                     if i ~= 1 then
-                        cost = pool:Acquire() ---@diagnostic disable-line: cast-local-type
+                        cost = pool:Acquire()
                         if not cost then
                             return false
                         end
@@ -4321,7 +4321,7 @@ local CompactVendorFrameMerchantButtonCostTemplate do
     _G.CompactVendorFrameMerchantButtonCostTemplate = CompactVendorFrameMerchantButtonCostTemplate
 
     function CompactVendorFrameMerchantButtonCostTemplate:OnLoad()
-        self.parent = self:GetParent() ---@diagnostic disable-line: assign-type-mismatch
+        self.parent = self:GetParent() ---@diagnostic expect-line: assign-type-mismatch
         self.Costs = {} ---@type CompactVendorFrameMerchantButtonCostButtonTemplate[]
         local prevCost ---@type CompactVendorFrameMerchantButtonCostButtonTemplate?
         for i = 1, 6 do -- hardcoded comfortable amount of frames
