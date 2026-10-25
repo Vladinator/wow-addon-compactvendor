@@ -17,6 +17,10 @@
     "Lua.workspace.ignoreDir": [
         ".vscode"
     ],
+    "Lua.diagnostics.disable": [
+        "toc-file-name"
+    ],
+    "Lua.type.weakUnionCheck": true,
     "Lua.diagnostics.globals": [
         "BagSearch_OnChar",
         "BagSearch_OnTextChanged",
@@ -105,6 +109,5 @@
         "UIDROPDOWNMENU_OPEN_MENU",
         "UIDropDownMenu_SetInitializeFunction",
         "YES"
-    ],
-    "Lua.type.weakUnionCheck": true
+    ]
 }
