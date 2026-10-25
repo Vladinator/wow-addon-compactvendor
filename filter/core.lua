@@ -1,4 +1,4 @@
-local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded
+local IsAddOnLoaded = IsAddOnLoaded or C_AddOns.IsAddOnLoaded ---@diagnostic expect-line: undefined-global
 
 local ns = select(2, ...) ---@type CompactVendorNS
 local FrameUtil = ns.FrameUtil

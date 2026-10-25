@@ -65,6 +65,7 @@ local function UpdateItemStatTable(itemLink)
         ReMapStatTable()
         return statTable
     end
+    ---@diagnostic expect-next-line: undefined-global
     local GetItemStats = GetItemStats ---@type (fun(itemLink: string, statTable?: StatTablePolyfill): StatTablePolyfill?)?
     if GetItemStats then
         statTable = statTable or {}
